@@ -50,8 +50,12 @@
   }
 }
 
+html,
 body {
   margin: 0;
+  padding: 0;
+  background: #08080d; /* match App dark background — prevents white flash and edges */
+  min-height: 100%;
 }
 
 #root {
@@ -60,10 +64,11 @@ body {
   margin: 0;
   text-align: center;
   border-inline: none;
-  min-height: 100svh;
+  min-height: 100vh;   /* use vh — more consistent across browsers/macOS */
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+  background: #08080d;
 }
 
 h1,
