@@ -1,49 +1,49 @@
 import { useState, useEffect } from "react";
 
 const NODES = [
-  { id: "production", label: "Plastic Production", value: 431, unit: "Mt/yr", base: 431, category: "driver", x: 9, y: 14, desc: "Global plastic production. 431 Mt in 2024, projected 590 Mt by 2050. The upstream source feeding all waste flows.", ix: "Real volume in megatonnes/year.", sensitivity: { waste_generated: 0.9, recycling_myth: 0.3, export_volume: 0.7 }},
-  { id: "consumption", label: "Consumer Demand", value: 75, unit: "/100", base: 75, category: "driver", x: 9, y: 36, desc: "Overconsumption in Global North. US: 4% of world population but generates 12% of waste. Per capita plastic waste up 263% since 1980.", ix: "0=minimal, 100=peak consumerism. 75=current.", sensitivity: { production: 0.8, waste_generated: 0.7 }},
-  { id: "waste_generated", label: "Waste Generated", value: 265, unit: "Mt/yr", base: 265, category: "flow", x: 28, y: 24, desc: "Municipal solid waste from high-income countries. US alone: 265 Mt/yr. High-income countries (16% of population) produce 34% of the world's waste.", ix: "Real volume. 265 Mt = US annual output.", sensitivity: { export_volume: 0.8, domestic_pressure: -0.6, recycling_myth: 0.4 }},
-  { id: "recycling_myth", label: "Recycling Myth", value: 85, unit: "/100", base: 85, category: "enabler", x: 19, y: 4, desc: "Public belief that recycling works. Industry spent millions promoting it since 1989 while knowing since 1973 it was economically unviable. Actual US recycling rate: 5-6%.", ix: "0=public aware, 100=total belief. 85=most trust it.", sensitivity: { domestic_pressure: -0.7, consumption: 0.3, production: 0.2 }},
-  { id: "domestic_pressure", label: "Domestic Pressure\nto Reduce", value: 20, unit: "/100", base: 20, category: "enabler", x: 9, y: 58, desc: "Political pressure to reduce waste at source. Cheap export + recycling myth eliminate urgency.", ix: "0=no will, 100=strong mandates. 20=almost none.", sensitivity: { production: -0.4, regulation_strength: 0.5 }},
-  { id: "export_volume", label: "Waste Exports", value: 35, unit: "Mt/yr", base: 35, category: "flow", x: 47, y: 16, desc: "Transboundary waste shipments. EU exported 35 Mt in 2023 (+75% since 2004). Includes plastic, e-waste, textiles, hazardous waste.", ix: "Real volume. 35 Mt = EU annual exports.", sensitivity: { governance_capacity: -0.6, informal_jobs: 0.7, health_damage: 0.5, economic_dependency: 0.7, env_contamination: 0.6, illegal_dumping: 0.5 }},
-  { id: "regulation_strength", label: "International\nRegulation", value: 40, unit: "/100", base: 40, category: "governance", x: 37, y: 4, desc: "Basel Convention + Ban Amendment + Plastic Waste Amendments. 191 parties but US absent. Plastics Treaty stalled after 3 failures (2024-2026).", ix: "0=no rules, 100=fully enforced. 40=loopholes rampant.", sensitivity: { export_volume: -0.5, evasion: -0.4 }},
-  { id: "evasion", label: "Evasion &\nMislabeling", value: 60, unit: "/100", base: 60, category: "enabler", x: 47, y: 38, desc: "Waste relabeled as 'refuse-derived fuel', 'donations', 'secondhand goods'. UK loses £50M/yr to fake recycling records. 10-20% of electronics shipped to Kenya are unusable.", ix: "0=honest, 100=systematic fraud. 60=widespread.", sensitivity: { export_volume: 0.5, governance_capacity: -0.3 }},
-  { id: "trade_coercion", label: "Trade Coercion\n(AGOA/FTA)", value: 70, unit: "/100", base: 70, category: "enabler", x: 28, y: 48, desc: "US threatened AGOA trade suspension when East Africa proposed banning secondhand clothing imports. Kenya backed down. ACC lobbied Kenya FTA as 'foothold' for plastics.", ix: "0=no leverage, 100=full coercion. 70=heavy.", sensitivity: { economic_dependency: 0.6, governance_capacity: -0.4, domestic_industry: -0.5 }},
-  { id: "governance_capacity", label: "Receiving Country\nGovernance", value: 25, unit: "/100", base: 25, category: "governance", x: 67, y: 9, desc: "NEMA enforcement: under-resourced. 2-10% containers inspected. KRA fraud KSh 452M (Mar 2026). Court orders ignored.", ix: "0=state failure, 100=world-class. 25=very weak.", sensitivity: { illegal_dumping: -0.7, evasion: -0.2 }},
-  { id: "illegal_dumping", label: "Illegal Dumping", value: 70, unit: "/100", base: 70, category: "impact", x: 67, y: 29, desc: "92% of Kenya's waste mismanaged. 70+ illegal dumps in Nairobi. Dandora: 2,000-3,500 t/day despite full since 2001. Criminal gangs control access.", ix: "0=managed, 100=total dumping. 70=vast majority.", sensitivity: { env_contamination: 0.8, health_damage: 0.7 }},
-  { id: "informal_jobs", label: "Informal Waste\nWorkers", value: 22, unit: "million", base: 22, category: "social", x: 87, y: 14, desc: "19-24M globally. 5,000 at Dandora earn <$1/day. 2M Kenyans in mitumba trade. Recover 60% of recycled plastic.", ix: "Real count in millions.", sensitivity: { political_resistance: 0.6, health_damage: 0.4 }},
-  { id: "economic_dependency", label: "Economic\nDependency", value: 65, unit: "/100", base: 65, category: "social", x: 67, y: 50, desc: "Kenya: mitumba serves 24.2M consumers, employs 2M. AGOA: $470M. Only 7% of profits stay local.", ix: "0=independent, 100=fully dependent. 65=deep.", sensitivity: { political_resistance: 0.7, domestic_industry: -0.6, governance_capacity: -0.3 }},
-  { id: "domestic_industry", label: "Local Industry\nCapacity", value: 15, unit: "/100", base: 15, category: "social", x: 37, y: 66, desc: "Kenya textiles: 110 manufacturers to <20. 85% closed after structural adjustment. Mills <45% of demand.", ix: "0=destroyed, 100=thriving. 15=near collapse.", sensitivity: { economic_dependency: -0.5 }},
-  { id: "health_damage", label: "Health Damage", value: 70, unit: "/100", base: 70, category: "impact", x: 87, y: 38, desc: "50% Dandora children: toxic blood lead. Soil: 13,500 ppm (90x safe). 400K-1M deaths/yr. Ship-breakers -20 years life expectancy.", ix: "0=none, 100=catastrophic. 70=severe.", sensitivity: { labor_capacity: -0.7, migration: 0.4 }},
-  { id: "env_contamination", label: "Environmental\nContamination", value: 65, unit: "/100", base: 65, category: "impact", x: 87, y: 60, desc: "Nairobi River: E.coli 1M/100ml. Lead, PCBs, DDT. Atacama: 3 km² clothing from space.", ix: "0=pristine, 100=irreversible. 65=severe.", sensitivity: { health_damage: 0.4, migration: 0.5, land_value: -0.6 }},
-  { id: "labor_capacity", label: "Labor\nProductivity", value: 35, unit: "/100", base: 35, category: "social", x: 57, y: 72, desc: "Lead reduces IQ. Kenya: 6.7M IQ points lost in under-5s, $5.52B (World Bank). Lead half-life: 30 years.", ix: "0=incapacitated, 100=full. 35=severely impaired.", sensitivity: { economic_dependency: 0.3, informal_jobs: 0.3 }},
-  { id: "migration", label: "Environmental\nMigration", value: 45, unit: "/100", base: 45, category: "impact", x: 87, y: 80, desc: "IOM: 200M environmental migrants by 2050. Dandora workers mostly migrants. Settle near waste on cheap land.", ix: "0=none, 100=mass migration. 45=significant.", sensitivity: { informal_jobs: 0.4, health_damage: 0.3 }},
-  { id: "political_resistance", label: "Resistance to\nReform", value: 60, unit: "/100", base: 60, category: "governance", x: 47, y: 80, desc: "Workers, traders, cartels resist. Kenya EPR suspended by court. <5% compliance.", ix: "0=no opposition, 100=blocked. 60=strong.", sensitivity: { governance_capacity: -0.4, regulation_strength: -0.2 }},
-  { id: "land_value", label: "Land\nDevaluation", value: 55, unit: "/100", base: 55, category: "impact", x: 72, y: 88, desc: "Contamination destroys property. Trapped communities. Dandora land: cheapest in Nairobi.", ix: "0=stable, 100=worthless. 55=severe.", sensitivity: { migration: 0.4 }},
+  { id: "production", label: "Plastic Production", value: 431, unit: "Mt/yr", base: 431, category: "driver", x: 9, y: 14, desc: "Global plastic production. 431 Mt in 2024, projected 590 Mt by 2050. The upstream source feeding all waste flows.", ix: "Real volume in megatonnes/year.", sources:["gem24","iisd","cci24"], sensitivity: { waste_generated: 0.9, recycling_myth: 0.3, export_volume: 0.7 }},
+  { id: "consumption", label: "Consumer Demand", value: 75, unit: "/100", base: 75, category: "driver", x: 9, y: 36, desc: "Overconsumption in Global North. US: 4% of world population but generates 12% of waste. Per capita plastic waste up 263% since 1980.", ix: "0=minimal, 100=peak consumerism. 75=current.", sources:["gem24"], sensitivity: { production: 0.8, waste_generated: 0.7 }},
+  { id: "waste_generated", label: "Waste Generated", value: 265, unit: "Mt/yr", base: 265, category: "flow", x: 28, y: 24, desc: "Municipal solid waste from high-income countries. US alone: 265 Mt/yr. High-income countries (16% of population) produce 34% of the world's waste.", ix: "Real volume. 265 Mt = US annual output.", sources:["gem24"], sensitivity: { export_volume: 0.8, domestic_pressure: -0.6, recycling_myth: 0.4 }},
+  { id: "recycling_myth", label: "Recycling Myth", value: 85, unit: "/100", base: 85, category: "enabler", x: 19, y: 4, desc: "Public belief that recycling works. Industry spent millions promoting it since 1989 while knowing since 1973 it was economically unviable. Actual US recycling rate: 5-6%.", ix: "0=public aware, 100=total belief. 85=most trust it.", sources:["cci24","bfp"], sensitivity: { domestic_pressure: -0.7, consumption: 0.3, production: 0.2 }},
+  { id: "domestic_pressure", label: "Domestic Pressure\nto Reduce", value: 20, unit: "/100", base: 20, category: "enabler", x: 9, y: 58, desc: "Political pressure to reduce waste at source. Cheap export + recycling myth eliminate urgency.", ix: "0=no will, 100=strong mandates. 20=almost none.", sources:["cci24"], sensitivity: { production: -0.4, regulation_strength: 0.5 }},
+  { id: "export_volume", label: "Waste Exports", value: 35, unit: "Mt/yr", base: 35, category: "flow", x: 47, y: 16, desc: "Transboundary waste shipments. EU exported 35 Mt in 2023 (+75% since 2004). Includes plastic, e-waste, textiles, hazardous waste.", ix: "Real volume. 35 Mt = EU annual exports.", sources:["eu_wsr","intercept","interpol"], sensitivity: { governance_capacity: -0.6, informal_jobs: 0.7, health_damage: 0.5, economic_dependency: 0.7, env_contamination: 0.6, illegal_dumping: 0.5 }},
+  { id: "regulation_strength", label: "International\nRegulation", value: 40, unit: "/100", base: 40, category: "governance", x: 37, y: 4, desc: "Basel Convention + Ban Amendment + Plastic Waste Amendments. 191 parties but US absent. Plastics Treaty stalled after 3 failures (2024-2026).", ix: "0=no rules, 100=fully enforced. 40=loopholes rampant.", sources:["basel","iisd"], sensitivity: { export_volume: -0.5, evasion: -0.4 }},
+  { id: "evasion", label: "Evasion &\nMislabeling", value: 60, unit: "/100", base: 60, category: "enabler", x: 47, y: 38, desc: "Waste relabeled as 'refuse-derived fuel', 'donations', 'secondhand goods'. UK loses \u00a350M/yr to fake recycling records. 10-20% of electronics shipped to Kenya are unusable.", ix: "0=honest, 100=systematic fraud. 60=widespread.", sources:["interpol","unodc26","ban_gps"], sensitivity: { export_volume: 0.5, governance_capacity: -0.3 }},
+  { id: "trade_coercion", label: "Trade Coercion\n(AGOA/FTA)", value: 70, unit: "/100", base: 70, category: "enabler", x: 28, y: 48, desc: "US threatened AGOA trade suspension when East Africa proposed banning secondhand clothing imports. Kenya backed down. ACC lobbied Kenya FTA as 'foothold' for plastics.", ix: "0=no leverage, 100=full coercion. 70=heavy.", sources:["acc_foia","qz_rw","foreign_policy"], sensitivity: { economic_dependency: 0.6, governance_capacity: -0.4, domestic_industry: -0.5 }},
+  { id: "governance_capacity", label: "Receiving Country\nGovernance", value: 25, unit: "/100", base: 25, category: "governance", x: 67, y: 9, desc: "NEMA enforcement: under-resourced. 2-10% containers inspected. KRA fraud KSh 452M (Mar 2026). Court orders ignored.", ix: "0=state failure, 100=world-class. 25=very weak.", sources:["dawan","gi_cor","standard21"], sensitivity: { illegal_dumping: -0.7, evasion: -0.2 }},
+  { id: "illegal_dumping", label: "Illegal Dumping", value: 70, unit: "/100", base: 70, category: "impact", x: 67, y: 29, desc: "92% of Kenya's waste mismanaged. 70+ illegal dumps in Nairobi. Dandora: 2,000-3,500 t/day despite full since 2001. Criminal gangs control access.", ix: "0=managed, 100=total dumping. 70=vast majority.", sources:["gi_cor","elephant","wiki_dand"], sensitivity: { env_contamination: 0.8, health_damage: 0.7 }},
+  { id: "informal_jobs", label: "Informal Waste\nWorkers", value: 22, unit: "million", base: 22, category: "social", x: 87, y: 14, desc: "19-24M globally. 5,000 at Dandora earn <$1/day. 2M Kenyans in mitumba trade. Recover 60% of recycled plastic.", ix: "Real count in millions.", sources:["gp_dump","hrr"], sensitivity: { political_resistance: 0.6, health_damage: 0.4 }},
+  { id: "economic_dependency", label: "Economic\nDependency", value: 65, unit: "/100", base: 65, category: "social", x: 67, y: 50, desc: "Kenya: mitumba serves 24.2M consumers, employs 2M. AGOA: $470M. Only 7% of profits stay local.", ix: "0=independent, 100=fully dependent. 65=deep.", sources:["qz_rw","cm_trash"], sensitivity: { political_resistance: 0.7, domestic_industry: -0.6, governance_capacity: -0.3 }},
+  { id: "domestic_industry", label: "Local Industry\nCapacity", value: 15, unit: "/100", base: 15, category: "social", x: 37, y: 66, desc: "Kenya textiles: 110 manufacturers to <20. 85% closed after structural adjustment. Mills <45% of demand.", ix: "0=destroyed, 100=thriving. 15=near collapse.", sources:["cm_trash"], sensitivity: { economic_dependency: -0.5 }},
+  { id: "health_damage", label: "Health Damage", value: 70, unit: "/100", base: 70, category: "impact", x: 87, y: 38, desc: "50% Dandora children: toxic blood lead. Soil: 13,500 ppm (90x safe). 400K-1M deaths/yr. Ship-breakers -20 years life expectancy.", ix: "0=none, 100=catastrophic. 70=severe.", sources:["unep07","un_news07","hrr","wb24"], sensitivity: { labor_capacity: -0.7, migration: 0.4 }},
+  { id: "env_contamination", label: "Environmental\nContamination", value: 65, unit: "/100", base: 65, category: "impact", x: 87, y: 60, desc: "Nairobi River: E.coli 1M/100ml. Lead, PCBs, DDT. Atacama: 3 km\u00b2 clothing from space.", ix: "0=pristine, 100=irreversible. 65=severe.", sources:["conv_riv","bgs","unep07"], sensitivity: { health_damage: 0.4, migration: 0.5, land_value: -0.6 }},
+  { id: "labor_capacity", label: "Labor\nProductivity", value: 35, unit: "/100", base: 35, category: "social", x: 57, y: 72, desc: "Lead reduces IQ. Kenya: 6.7M IQ points lost in under-5s, $5.52B (World Bank). Lead half-life: 30 years.", ix: "0=incapacitated, 100=full. 35=severely impaired.", sources:["wb24","hrr"], sensitivity: { economic_dependency: 0.3, informal_jobs: 0.3 }},
+  { id: "migration", label: "Environmental\nMigration", value: 45, unit: "/100", base: 45, category: "impact", x: 87, y: 80, desc: "IOM: 200M environmental migrants by 2050. Dandora workers mostly migrants. Settle near waste on cheap land.", ix: "0=none, 100=mass migration. 45=significant.", sources:["gp_dump"], sensitivity: { informal_jobs: 0.4, health_damage: 0.3 }},
+  { id: "political_resistance", label: "Resistance to\nReform", value: 60, unit: "/100", base: 60, category: "governance", x: 47, y: 80, desc: "Workers, traders, cartels resist. Kenya EPR suspended by court. <5% compliance.", ix: "0=no opposition, 100=blocked. 60=strong.", sources:["kenyans_epr"], sensitivity: { governance_capacity: -0.4, regulation_strength: -0.2 }},
+  { id: "land_value", label: "Land\nDevaluation", value: 55, unit: "/100", base: 55, category: "impact", x: 72, y: 88, desc: "Contamination destroys property. Trapped communities. Dandora land: cheapest in Nairobi.", ix: "0=stable, 100=worthless. 55=severe.", sources:["elephant"], sensitivity: { migration: 0.4 }},
 ];
 
 const LOOPS = [
-  { id: "R1", name: "Governance Erosion", color: "#ff4444", nodes: ["export_volume","governance_capacity","illegal_dumping","env_contamination"], desc: "Waste overwhelms regulators → less enforcement → more dumping → damage → governance weakens", icon: "🏛️", ev: "INTERPOL: 77% of illegal shipments from Europe. EU: 1/3 illegal. Malaysia: 200+ unlicensed factories after China's ban." },
-  { id: "R2", name: "Economic Dependency", color: "#ffaa22", nodes: ["export_volume","economic_dependency","political_resistance","governance_capacity"], desc: "Waste creates jobs → constituencies resist bans → trade threats reinforce → dependency deepens", icon: "💰", ev: "Kenya AGOA: $470M/yr, 66,804 workers. US threatened revocation. Only Rwanda defied — punished." },
-  { id: "R3", name: "Health–Productivity Trap", color: "#ff66aa", nodes: ["health_damage","labor_capacity","economic_dependency","informal_jobs"], desc: "Toxic exposure → disease → lost productivity → poverty → more waste work → more exposure", icon: "🏥", ev: "50% Dandora children toxic lead. World Bank: 6.7M IQ points lost, $5.52B. Lead half-life: 30 years." },
-  { id: "R4", name: "Moral Hazard", color: "#4488ff", nodes: ["production","waste_generated","export_volume","domestic_pressure"], desc: "Cheap export kills pressure → overproduction → more waste → more exports needed", icon: "🏭", ev: "Industry knew since 1973. US: 5–6%. ACC: $22.3M lobbying. 234 lobbyists at treaty talks." },
-  { id: "R5", name: "Informal Lock-in", color: "#44cc88", nodes: ["informal_jobs","political_resistance","governance_capacity","illegal_dumping"], desc: "Waste jobs → constituency → resistance to reform → weak governance → continued dumping", icon: "🔒", ev: "19–24M depend on waste. Kenya: 2M mitumba, 5K Dandora. EPR suspended. <5% compliance." },
-  { id: "R6", name: "Environmental Migration", color: "#aa66ff", nodes: ["env_contamination","migration","informal_jobs","health_damage"], desc: "Contamination → displacement → migrants near waste → more exposure", icon: "🌍", ev: "1M+ near Dandora include migrants. ILO: 68% below min wage. Children age 9 handle hazardous." },
+  { id: "R1", name: "Governance Erosion", color: "#ff4444", nodes: ["export_volume","governance_capacity","illegal_dumping","env_contamination"], desc: "Waste overwhelms regulators \u2192 less enforcement \u2192 more dumping \u2192 damage \u2192 governance weakens", icon: "\uD83C\uDFDB\uFE0F", ev: "INTERPOL: 77% of illegal shipments from Europe. EU: 1/3 illegal. Malaysia: 200+ unlicensed factories after China's ban.", sources:["interpol","unodc26"] },
+  { id: "R2", name: "Economic Dependency", color: "#ffaa22", nodes: ["export_volume","economic_dependency","political_resistance","governance_capacity"], desc: "Waste creates jobs \u2192 constituencies resist bans \u2192 trade threats reinforce \u2192 dependency deepens", icon: "\uD83D\uDCB0", ev: "Kenya AGOA: $470M/yr, 66,804 workers. US threatened revocation. Only Rwanda defied \u2014 punished.", sources:["qz_rw","foreign_policy","cm_trash"] },
+  { id: "R3", name: "Health\u2013Productivity Trap", color: "#ff66aa", nodes: ["health_damage","labor_capacity","economic_dependency","informal_jobs"], desc: "Toxic exposure \u2192 disease \u2192 lost productivity \u2192 poverty \u2192 more waste work \u2192 more exposure", icon: "\uD83C\uDFE5", ev: "50% Dandora children toxic lead. World Bank: 6.7M IQ points lost, $5.52B. Lead half-life: 30 years.", sources:["unep07","wb24","hrr"] },
+  { id: "R4", name: "Moral Hazard", color: "#4488ff", nodes: ["production","waste_generated","export_volume","domestic_pressure"], desc: "Cheap export kills pressure \u2192 overproduction \u2192 more waste \u2192 more exports needed", icon: "\uD83C\uDFED", ev: "Industry knew since 1973. US: 5\u20136%. ACC: $22.3M lobbying. 234 lobbyists at treaty talks.", sources:["cci24","opensec","infmap"] },
+  { id: "R5", name: "Informal Lock-in", color: "#44cc88", nodes: ["informal_jobs","political_resistance","governance_capacity","illegal_dumping"], desc: "Waste jobs \u2192 constituency \u2192 resistance to reform \u2192 weak governance \u2192 continued dumping", icon: "\uD83D\uDD12", ev: "19\u201324M depend on waste. Kenya: 2M mitumba, 5K Dandora. EPR suspended. <5% compliance.", sources:["gp_dump","kenyans_epr","hrr"] },
+  { id: "R6", name: "Environmental Migration", color: "#aa66ff", nodes: ["env_contamination","migration","informal_jobs","health_damage"], desc: "Contamination \u2192 displacement \u2192 migrants near waste \u2192 more exposure", icon: "\uD83C\uDF0D", ev: "1M+ near Dandora include migrants. ILO: 68% below min wage. Children age 9 handle hazardous.", sources:["gp_dump","elephant"] },
 ];
 
 const SCENARIOS = [
-  { id: "china_sword", name: "🇨🇳 China National Sword", desc: "China bans waste imports — flows redirect to Global South", changes: { export_volume: 60, governance_capacity: 15, illegal_dumping: 85, informal_jobs: 28, env_contamination: 80, health_damage: 80 }},
-  { id: "treaty_passes", name: "📜 Plastics Treaty Passes", desc: "Binding production caps + mandatory EPR", changes: { production: 280, regulation_strength: 75, export_volume: 15, domestic_pressure: 65, evasion: 30, recycling_myth: 40 }},
-  { id: "agoa_removed", name: "🔓 AGOA Leverage Removed", desc: "Kenya regulates imports without trade punishment", changes: { trade_coercion: 15, governance_capacity: 50, domestic_industry: 40, economic_dependency: 40, political_resistance: 35 }},
-  { id: "eu_ban", name: "🇪🇺 EU Export Ban (Nov 2026)", desc: "EU bans plastic exports to non-OECD", changes: { export_volume: 20, regulation_strength: 60, evasion: 45, domestic_pressure: 40, governance_capacity: 30 }},
-  { id: "baseline", name: "↺ Reset", desc: "Return to current values", changes: {} },
+  { id: "china_sword", name: "\uD83C\uDDE8\uD83C\uDDF3 China National Sword", desc: "China bans waste imports \u2014 flows redirect to Global South", changes: { export_volume: 60, governance_capacity: 15, illegal_dumping: 85, informal_jobs: 28, env_contamination: 80, health_damage: 80 }},
+  { id: "treaty_passes", name: "\uD83D\uDCDC Plastics Treaty Passes", desc: "Binding production caps + mandatory EPR", changes: { production: 280, regulation_strength: 75, export_volume: 15, domestic_pressure: 65, evasion: 30, recycling_myth: 40 }},
+  { id: "agoa_removed", name: "\uD83D\uDD13 AGOA Leverage Removed", desc: "Kenya regulates imports without trade punishment", changes: { trade_coercion: 15, governance_capacity: 50, domestic_industry: 40, economic_dependency: 40, political_resistance: 35 }},
+  { id: "eu_ban", name: "\uD83C\uDDEA\uD83C\uDDFA EU Export Ban (Nov 2026)", desc: "EU bans plastic exports to non-OECD", changes: { export_volume: 20, regulation_strength: 60, evasion: 45, domestic_pressure: 40, governance_capacity: 30 }},
+  { id: "baseline", name: "\u21BA Reset", desc: "Return to current values", changes: {} },
 ];
 
 const GLOSSARY = {
-  "Index (0–100)": "Most nodes use 0–100. 0 = problem absent, 100 = peak intensity. Baseline = current reality.",
+  "Index (0\u2013100)": "Most nodes use 0\u2013100. 0 = problem absent, 100 = peak intensity. Baseline = current reality.",
   "Sensitivity (%)": "Each arrow has a %. If source doubles, target changes by that %. Negative = inverse.",
-  "Reinforcing Loop (R)": "A snowball cycle. All 6 loops here are reinforcing — they make the problem self-perpetuating.",
+  "Reinforcing Loop (R)": "A snowball cycle. All 6 loops here are reinforcing \u2014 they make the problem self-perpetuating.",
   "Cascade (3 levels)": "L1: full sensitivity. L2: dampened 40%. L3: dampened 70%. Simulates real ripple effects.",
   "Mt/yr": "Megatonnes/year = millions of tonnes. Real measured volumes from UN and trade data.",
   "Basel Convention": "1989 hazardous waste treaty. 191 parties. The US is NOT a member.",
@@ -53,54 +53,95 @@ const GLOSSARY = {
   "National Sword": "China's 2018 import ban. Imports dropped 99%. Waste redirected to Africa/SE Asia.",
   "ACC": "American Chemistry Council. $22.3M lobbying. Wanted Kenya as 'hub' for US plastics.",
   "NEMA": "Kenya's environmental regulator. Under-resourced. 40% liable in Owino Uhuru lead case.",
-  "Mitumba": "Swahili 'bundles' — secondhand clothing. 200K t/yr to Kenya. 30–40% is waste.",
+  "Mitumba": "Swahili 'bundles' \u2014 secondhand clothing. 200K t/yr to Kenya. 30\u201340% is waste.",
   "Dandora": "Nairobi's only dump. Full since 2001, takes 2,000+ t/day. 1M nearby. 50% children toxic lead.",
   "Waste Colonialism": "Systematic transfer of environmental harm from wealthy nations to Global South.",
 };
 
+const SOURCES = {
+  unep07: {l:"UNEP 2007", f:"UNEP / Njoroge Kimani — Environmental Pollution and Impact to Public Health: Implications of the Dandora Municipal Dumping Site (2007)", u:"https://www.habitants.org/content/download/63622/744639/version/1/file/Report+UNEP+Dandora+Environmental+Pollution+and+Impact+to+Public+Health+(2007).pdf"},
+  un_news07: {l:"UN News 2007", f:"UN News — Dandora Health Hazard Warning (Oct 2007)", u:"https://news.un.org/en/story/2007/10/235002"},
+  wb24: {l:"World Bank 2024", f:"Lovo & Rawlings — The Health Burden of E-Waste, World Bank Economic Review (2024)", u:"https://doi.org/10.1093/wber/lhae053"},
+  gem24: {l:"Global E-Waste Monitor", f:"Global E-Waste Monitor 2024 (ITU/UNITAR)", u:"https://ewastemonitor.info/the-global-e-waste-monitor-2024/"},
+  ban_gps: {l:"BAN GPS Project", f:"Basel Action Network — Secret Tracking Project finds US e-waste exported to developing countries (2016)", u:"https://www.ban.org/news-new/2016/9/15/secret-tracking-project-finds-that-your-old-electronic-waste-gets-exported-to-developing-countries"},
+  ban_bros: {l:"BAN Brokers of Shame", f:"Basel Action Network — Brokers of Shame Report: 10 US e-waste brokers exporting 169,000 tonnes (Oct 2025)", u:"https://www.ban.org/"},
+  acc_foia: {l:"Unearthed/Greenpeace", f:"Unearthed / Greenpeace — FOIA documents: ACC lobbied for Kenya FTA as 'hub' and 'foothold' for US plastics in Africa (Aug 30, 2020)", u:"https://unearthed.greenpeace.org/2020/08/30/plastic-waste-africa-oil-kenya-us-trade-deal-trump/"},
+  gp_africa_acc: {l:"Greenpeace Africa", f:"Greenpeace Africa — Industry Lobby the US Government to Make Africa Backslide on Plastics", u:"https://www.greenpeace.org/africa/en/press/12046/industry-lobby-the-us-government-to-make-africa-backslide-on-plastics/"},
+  cm_trash: {l:"Changing Markets", f:"Changing Markets Foundation — Trashion: The Stealth Export of Waste Plastic Clothes to Kenya", u:"https://changingmarkets.org/report/trashion-the-stealth-export-of-waste-plastic-clothes-to-kenya/"},
+  gi_cor: {l:"Global Initiative", f:"Global Initiative Against Transnational Organized Crime — Corruption and Criminality at Nairobi's Main Dumpsite", u:"https://riskbulletins.globalinitiative.net/esa-obs-015/02-corruption-and-criminality-at-nairobis-main-dumpsite.html"},
+  intercept: {l:"The Intercept", f:"The Intercept — Africa's Exploding Plastic Nightmare: exports to Africa quadrupled after China's 2018 ban (Apr 2020)", u:"https://theintercept.com/2020/04/19/africa-plastic-waste-kenya-ethiopia/"},
+  interpol: {l:"INTERPOL", f:"INTERPOL Operation 30 Days of Action — 77% of illegal waste shipments originate in Europe", u:"https://www.interpol.int/en/News-and-Events/News/2020/INTERPOL-report-alerts-to-sharp-rise-in-plastic-waste-crime"},
+  unodc26: {l:"UNODC 2026", f:"UNODC (Feb 2026) — Waste crime generates up to $18 billion in illicit annual profits", u:"https://www.unodc.org/"},
+  mfn_ou: {l:"Media For Nature", f:"Media For Nature — Owino Uhuru Supreme Court Ruling: KSh 1.3B compensation, NEMA 40% liable (Dec 2024)", u:"https://mediafornature.org/2024/12/18/environmental-justice-triumphs-supreme-court-holds-polluters-accountable-in-owino-uhuru-lead-poisoning-case/"},
+  hrr: {l:"HR Research", f:"Human Rights Research — Lead Exposure from E-Waste: Dandora Case Study, Nairobi Kenya", u:"https://www.humanrightsresearch.org/post/lead-exposure-from-e-waste-a-case-study-of-dandora-dumpsite-nairobi-kenya"},
+  smea: {l:"Sustainability MEA", f:"Sustainability MEA / KNBS — E-Waste in Kenya Surges to 53,559 Tonnes (2024)", u:"https://www.sustainabilitymea.com/e-waste-in-kenya-surges-to-over-53000-tonnes-amid-small-electronics-boom-knbs/"},
+  qz_rw: {l:"Quartz Africa", f:"Quartz Africa — US Suspends Rwanda AGOA Eligibility over Secondhand Clothes Ban (2018)", u:"https://qz.com/africa/1245015/trump-trade-war-us-suspends-rwanda-agoa-eligibility-over-secondhand-clothes-ban"},
+  eu_wsr: {l:"EU 2024/1157", f:"European Commission — Waste Shipment Regulation (EU) 2024/1157; plastic waste export ban to non-OECD from Nov 21, 2026", u:"https://environment.ec.europa.eu/topics/waste-and-recycling/waste-shipments_en"},
+  opensec: {l:"OpenSecrets", f:"OpenSecrets — American Chemistry Council Lobbying Expenditures ($22.3M in 2024)", u:"https://www.opensecrets.org/federal-lobbying/clients/summary?id=D000000365"},
+  infmap: {l:"InfluenceMap", f:"InfluenceMap — 234 fossil fuel and chemical lobbyists registered at INC-5.2 Plastics Treaty talks", u:"https://influencemap.org/report/The-Fossil-Fuel-and-Chemicals-Lobby-at-INC-5-2"},
+  gp_dump: {l:"Greenpeace Dumped", f:"Greenpeace Africa — Dumped (May 2025 documentary on Dandora waste pickers)", u:"https://www.greenpeace.org/africa/"},
+  dawan: {l:"Dawan Africa", f:"Dawan Africa — KRA cracks down on KSh 452M fraud scheme at Mombasa port, suspends staff and clearing agents (Mar 2026)", u:"https://www.dawan.africa/news/kra-cracks-down-on-ksh-452-million-fraud-scheme-suspends-staff-and-clearing-agents"},
+  pav_bam: {l:"Pan African Visions", f:"Pan African Visions — Kenya Moves Closer to Ratifying the Bamako Convention After 30 Years", u:"https://panafricanvisions.com/2026/01/kenya-moves-closer-to-ratifying-the-bamako-convention-after-30-years-of-waiting/"},
+  bfp: {l:"Break Free From Plastic", f:"Break Free From Plastic — 2023 Global Brand Audit: Coca-Cola top polluter in Kenya (41.7% PET)", u:"https://www.breakfreefromplastic.org/2024/02/07/bffp-movement-unveils-2023-global-brand-audit-results/"},
+  pt_aepw: {l:"Planet Tracker", f:"Planet Tracker — Alliance to End Plastic Waste: achieved 0.2% of target (2022 analysis)", u:"https://planet-tracker.org/wp-content/uploads/2022/08/AEPW.pdf"},
+  desmog: {l:"DeSmog", f:"DeSmog — New Global Market for Plastic Credits Threatens Livelihoods at Kenyan Dump (Aug 2025)", u:"https://www.desmog.com/2025/08/05/new-global-market-for-plastic-credits-threatens-livelihoods-at-kenyan-dump/"},
+  basel: {l:"Basel Convention", f:"Basel Convention (1989) — Control of Transboundary Movements of Hazardous Wastes; US remains only industrialized non-party", u:"https://en.wikipedia.org/wiki/Basel_Convention"},
+  standard21: {l:"The Standard 2021", f:"The Standard — Court gives NMS six months to close Dandora dumpsite (Justice Kossy Bor ruling, July 2021)", u:"https://www.standardmedia.co.ke/national/article/2001418368/court-gives-nms-six-months-to-close-down-dandora-dumpsite"},
+  wiki_dand: {l:"Wikipedia Dandora", f:"Wikipedia — Dandora dumpsite (history, establishment 1975, declared full 2001)", u:"https://en.wikipedia.org/wiki/Dandora"},
+  elephant: {l:"The Elephant", f:"The Elephant — Dandora Dumpsite: Where the Recycling Dream Goes to Die", u:"https://www.theelephant.info/opinion/2022/09/23/dandora-dumpsite-where-the-recycling-dream-goes-to-die/"},
+  iisd: {l:"IISD ENB", f:"IISD Earth Negotiations Bulletin — Global Plastics Treaty INC-5 / INC-5.2 / INC-5.3 summaries", u:"https://enb.iisd.org/plastic-pollution-marine-environment-negotiating-committee-inc5-2"},
+  cci24: {l:"Climate Integrity", f:"Centre for Climate Integrity — The Fraud of Plastic Recycling (Feb 2024): industry knew since 1973", u:"https://climateintegrity.org/plastics-fraud"},
+  lampoon: {l:"Lampoon", f:"Lampoon Magazine — Kenya secondhand clothing: two-thirds synthetic plastic fibers", u:"https://lampoonmagazine.com/kenya-second-hand-clothing-market-textile-waste-plastic-pollution/"},
+  bgs: {l:"British Geol. Survey", f:"British Geological Survey — Accumulation of Toxic Substances in Nairobi River Sediments", u:"https://www.bgs.ac.uk/news/accumulation-of-toxic-substances-in-nairobis-river-sediments/"},
+  conv_riv: {l:"The Conversation", f:"The Conversation — Nairobi River pollution study: E. coli 1 million per 100ml", u:"https://theconversation.com/i-looked-at-how-polluted-nairobi-river-is-what-i-found-123533"},
+  kenyans_epr: {l:"Kenyans.co.ke", f:"Kenyans.co.ke — EPR Regulations 2024 suspended by court (May 2025)", u:"https://www.kenyans.co.ke/"},
+  foreign_policy: {l:"Foreign Policy", f:"Foreign Policy — US suspended Rwanda apparel benefits over secondhand clothing ban (2018)", u:"https://foreignpolicy.com/"},
+  the_star: {l:"The Star", f:"The Star — Kisumu Kachok dumpsite closed (2022)", u:"https://www.the-star.co.ke/counties/nyanza/2022-07-22-governor-nyongo-closes-kisumus-kachok-dumpsite"},
+};
+
 const ICEBERG = [
-  { layer: "Events", color: "#ff4444", icon: "💥", desc: "What we see", items: ["Dandora receives 2,000+ t/day despite court closure order", "30–40% of mitumba imports are waste, not clothes", "50% of children near Dandora have toxic lead levels", "KRA fraud: KSh 452M at Mombasa port (Mar 2026)"] },
-  { layer: "Patterns", color: "#ffaa22", icon: "📈", desc: "Trends over time", items: ["Waste to Africa quadrupled after China's 2018 ban", "Kenya textiles collapsed: 110 → <20 manufacturers", "E-waste: 3,000t (2012) → 53,559t (2024)", "Plastics Treaty failed 3 times (2024–2026)"] },
-  { layer: "Structures", color: "#4488ff", icon: "⚙️", desc: "Rules, power, institutions", items: ["US hasn't ratified Basel — world's largest gap", "AGOA used as trade weapon against env. policy", "ACC lobbied Kenya FTA as 'foothold' for plastics", "EPR regulations suspended by court within months"] },
-  { layer: "Mental Models", color: "#aa66ff", icon: "🧠", desc: "Deep assumptions", items: ["'Recycling works' — industry myth since 1973", "'Waste = someone else's problem'", "'Development aid' framing disguises dumping", "'Free trade overrides env. sovereignty'"] },
+  { layer: "Events", color: "#ff4444", icon: "\uD83D\uDCA5", desc: "What we see", items: ["Dandora receives 2,000+ t/day despite court closure order", "30\u201340% of mitumba imports are waste, not clothes", "50% of children near Dandora have toxic lead levels", "KRA fraud: KSh 452M at Mombasa port (Mar 2026)"] },
+  { layer: "Patterns", color: "#ffaa22", icon: "\uD83D\uDCC8", desc: "Trends over time", items: ["Waste to Africa quadrupled after China's 2018 ban", "Kenya textiles collapsed: 110 \u2192 <20 manufacturers", "E-waste: 3,000t (2012) \u2192 53,559t (2024)", "Plastics Treaty failed 3 times (2024\u20132026)"] },
+  { layer: "Structures", color: "#4488ff", icon: "\u2699\uFE0F", desc: "Rules, power, institutions", items: ["US hasn't ratified Basel \u2014 world's largest gap", "AGOA used as trade weapon against env. policy", "ACC lobbied Kenya FTA as 'foothold' for plastics", "EPR regulations suspended by court within months"] },
+  { layer: "Mental Models", color: "#aa66ff", icon: "\uD83E\uDDE0", desc: "Deep assumptions", items: ["'Recycling works' \u2014 industry myth since 1973", "'Waste = someone else's problem'", "'Development aid' framing disguises dumping", "'Free trade overrides env. sovereignty'"] },
 ];
 
 const KENYA_TIMELINE = [
-  { year: "1975", event: "Dandora dumpsite established with World Bank financing as temporary solution for Nairobi (pop. 500,000)", color: "#4488ff" },
-  { year: "1999", event: "Environmental Management and Coordination Act (EMCA) passed. NEMA established as regulator.", color: "#44cc88" },
-  { year: "2001", event: "Dandora officially declared full. Design capacity of 500,000 tonnes exceeded. Still operating today.", color: "#ffaa22" },
-  { year: "2007", event: "UNEP study by Njoroge Kimani finds 50% of children near Dandora have toxic blood lead levels", color: "#ff66aa" },
-  { year: "2017", event: "Kenya's plastic bag ban enacted — among the world's strictest, $40K fine + 4 years prison", color: "#44cc88" },
-  { year: "2018", event: "China's National Sword takes effect. Waste redirects globally. Exports to Africa quadruple within a year.", color: "#ff4444" },
-  { year: "2020", event: "ACC FOIA documents leaked: US plastic lobby sought Kenya FTA as 'foothold' for African plastic trade", color: "#ff4444" },
-  { year: "2021", event: "Justice Kossy Bor orders Dandora closure within 6 months. Court order ignored — no alternative site, cartel control.", color: "#ffaa22" },
-  { year: "2024", event: "EPR Regulations gazetted November 2024. Suspended by court within months. <5% producer compliance.", color: "#aa66ff" },
-  { year: "2024", event: "Supreme Court upholds KSh 1.3 billion Owino Uhuru lead poisoning ruling. NEMA found 40% liable.", color: "#44cc88" },
-  { year: "2026", event: "KRA suspends 6 staff + 21 clearing agents in KSh 452M fraud scheme at Mombasa port (March)", color: "#ff4444" },
+  { year: "1975", event: "Dandora dumpsite established with World Bank financing as temporary solution for Nairobi (pop. 500,000)", color: "#4488ff", sources:["wiki_dand"] },
+  { year: "1999", event: "Environmental Management and Coordination Act (EMCA) passed. NEMA established as regulator.", color: "#44cc88", sources:[] },
+  { year: "2001", event: "Dandora officially declared full. Design capacity of 500,000 tonnes exceeded. Still operating today.", color: "#ffaa22", sources:["wiki_dand","elephant"] },
+  { year: "2007", event: "UNEP study by Njoroge Kimani finds 50% of children near Dandora have toxic blood lead levels", color: "#ff66aa", sources:["unep07","un_news07"] },
+  { year: "2017", event: "Kenya's plastic bag ban enacted \u2014 among the world's strictest, $40K fine + 4 years prison", color: "#44cc88", sources:[] },
+  { year: "2018", event: "China's National Sword takes effect. Waste redirects globally. Exports to Africa quadruple within a year.", color: "#ff4444", sources:["intercept"] },
+  { year: "2020", event: "ACC FOIA documents leaked: US plastic lobby sought Kenya FTA as 'foothold' for African plastic trade", color: "#ff4444", sources:["acc_foia","gp_africa_acc"] },
+  { year: "2021", event: "Justice Kossy Bor orders Dandora closure within 6 months. Court order ignored \u2014 no alternative site, cartel control.", color: "#ffaa22", sources:["standard21","gi_cor"] },
+  { year: "2024", event: "EPR Regulations gazetted November 2024. Suspended by court within months. <5% producer compliance.", color: "#aa66ff", sources:["kenyans_epr"] },
+  { year: "2024", event: "Supreme Court upholds KSh 1.3 billion Owino Uhuru lead poisoning ruling. NEMA found 40% liable.", color: "#44cc88", sources:["mfn_ou"] },
+  { year: "2026", event: "KRA suspends 6 staff + 21 clearing agents in KSh 452M fraud scheme at Mombasa port (March)", color: "#ff4444", sources:["dawan"] },
 ];
 
 const KENYA_ACTORS = [
-  { name: "NEMA", role: "Kenya's environmental regulator. Chronically under-resourced. Only 2–10% of containers inspected. Found 40% liable for Owino Uhuru lead poisoning.", side: "regulator", color: "#44cc88" },
-  { name: "ACC — American Chemistry Council", role: "US petrochemical lobby. Spent $22.3M on lobbying in 2024. FOIA docs revealed plan to make Kenya a 'hub' for US plastics across Africa.", side: "corporate", color: "#ff4444" },
-  { name: "Mombasa Port / KRA", role: "East Africa's largest port, 45.45 Mt cargo annually. Only 2–10% of containers inspected. KSh 452M fraud scheme (Mar 2026). Gateway to 6 nations.", side: "infrastructure", color: "#ffaa22" },
-  { name: "Gikomba Market Traders", role: "~100,000 workers handling 11,000 bales/day. Buy sealed mitumba blind — 20–50% of contents are unsellable. Serial fires suggest arson by land cartels.", side: "trade", color: "#aa66ff" },
-  { name: "Dandora Waste Pickers", role: "5,000 workers including children, controlled by criminal gangs. Earn ~$0.14/kg for recyclable plastic. Cartel fees: ~500 KSh per truck.", side: "informal", color: "#ff66aa" },
-  { name: "CEJAD / Greenpeace Africa", role: "Civil society coalitions pushing for Bamako Convention ratification, waste picker formalization, and stronger EPR enforcement.", side: "resistance", color: "#4488ff" },
+  { name: "NEMA", role: "Kenya's environmental regulator. Chronically under-resourced. Only 2\u201310% of containers inspected. Found 40% liable for Owino Uhuru lead poisoning.", side: "regulator", color: "#44cc88", sources:["mfn_ou","pav_bam"] },
+  { name: "ACC \u2014 American Chemistry Council", role: "US petrochemical lobby. Spent $22.3M on lobbying in 2024. FOIA docs revealed plan to make Kenya a 'hub' for US plastics across Africa.", side: "corporate", color: "#ff4444", sources:["acc_foia","opensec","gp_africa_acc"] },
+  { name: "Mombasa Port / KRA", role: "East Africa's largest port, 45.45 Mt cargo annually. Only 2\u201310% of containers inspected. KSh 452M fraud scheme (Mar 2026). Gateway to 6 nations.", side: "infrastructure", color: "#ffaa22", sources:["dawan"] },
+  { name: "Gikomba Market Traders", role: "~100,000 workers handling 11,000 bales/day. Buy sealed mitumba blind \u2014 20\u201350% of contents are unsellable. Serial fires suggest arson by land cartels.", side: "trade", color: "#aa66ff", sources:["cm_trash","lampoon"] },
+  { name: "Dandora Waste Pickers", role: "5,000 workers including children, controlled by criminal gangs. Earn ~$0.14/kg for recyclable plastic. Cartel fees: ~500 KSh per truck.", side: "informal", color: "#ff66aa", sources:["gi_cor","gp_dump","hrr"] },
+  { name: "CEJAD / Greenpeace Africa", role: "Civil society coalitions pushing for Bamako Convention ratification, waste picker formalization, and stronger EPR enforcement.", side: "resistance", color: "#4488ff", sources:["pav_bam","gp_dump"] },
 ];
 
 const KENYA_STREAMS = [
-  { name: "Plastic Waste", color: "#4488ff", icon: "🧪", volume: "92% mismanaged", origin: "China (pre-2018), US, EU", detail: "Plastic was the US's #1 export to Kenya by category ($58M, 2019). After China's ban, plastic waste exports to Africa quadrupled. Only 5% recycled." },
-  { name: "Electronic Waste", color: "#ffaa22", icon: "💻", volume: "53,559 t (2024)", origin: "UK, Germany, US, China, Malaysia", detail: "Surged from ~3,000t (2012) to 53,559t (2024). 10-20% of imported electronics are non-functional. Only 1-5% formally recycled. BAN GPS trackers confirmed US e-waste reaching Kenya." },
-  { name: "Textile Waste (Mitumba)", color: "#aa66ff", icon: "👕", volume: "200,000 t/yr", origin: "China, Pakistan, UK, Germany, Canada, US", detail: "Over 900 million garments annually. 30-40% unsellable waste. Two-thirds synthetic (plastic). H&M, Nike, YSL items found at Dandora. Textile waste piles along Nairobi River." },
+  { name: "Plastic Waste", color: "#4488ff", icon: "\uD83E\uDDEA", volume: "92% mismanaged", origin: "China (pre-2018), US, EU", detail: "Plastic was the US's #1 export to Kenya by category ($58M, 2019). After China's ban, plastic waste exports to Africa quadrupled. Only 5% recycled.", sources:["intercept","acc_foia"] },
+  { name: "Electronic Waste", color: "#ffaa22", icon: "\uD83D\uDCBB", volume: "53,559 t (2024)", origin: "UK, Germany, US, China, Malaysia", detail: "Surged from ~3,000t (2012) to 53,559t (2024). 10-20% of imported electronics are non-functional. Only 1-5% formally recycled. BAN GPS trackers confirmed US e-waste reaching Kenya.", sources:["smea","ban_gps","gem24"] },
+  { name: "Textile Waste (Mitumba)", color: "#aa66ff", icon: "\uD83D\uDC55", volume: "200,000 t/yr", origin: "China, Pakistan, UK, Germany, Canada, US", detail: "Over 900 million garments annually. 30-40% unsellable waste. Two-thirds synthetic (plastic). H&M, Nike, YSL items found at Dandora. Textile waste piles along Nairobi River.", sources:["cm_trash","lampoon"] },
 ];
 
 const CC = { driver: "#4488ff", flow: "#ffaa22", enabler: "#aa66ff", governance: "#44cc88", social: "#ff66aa", impact: "#ff4444" };
 
-// FIX: use explicit touched Set instead of float equality check
+// FIX #5: use an explicit touched Set instead of fragile float equality
 function cascade(sid, nv) {
   const R = {}; NODES.forEach(n => R[n.id] = n.base); R[sid] = nv;
-  const s = NODES.find(n => n.id === sid); if (!s?.sensitivity) return R;
   const touched = new Set([sid]);
+  const s = NODES.find(n => n.id === sid); if (!s?.sensitivity) return R;
   const r = nv / s.base, L1 = {};
   Object.entries(s.sensitivity).forEach(([t, v]) => {
     const n = NODES.find(x => x.id === t);
@@ -113,9 +154,9 @@ function cascade(sid, nv) {
       if (t === sid) return;
       const tn = NODES.find(x => x.id === t); if (!tn) return;
       const d = (val / n.base - 1) * v * 0.6;
-      if (!touched.has(t)) { R[t] = Math.max(0, tn.base * (1 + d)); touched.add(t); }
-      else { R[t] = Math.max(0, R[t] * (1 + d * 0.5)); }
+      R[t] = Math.max(0, touched.has(t) && t !== id ? R[t] * (1 + d * 0.5) : tn.base * (1 + d));
       L2[t] = R[t];
+      touched.add(t);
     });
   });
   Object.entries(L2).forEach(([id, val]) => {
@@ -134,6 +175,25 @@ function Tip({ term, children }) {
   const [o, setO] = useState(false); const d = GLOSSARY[term];
   return (<span style={{position:"relative",display:"inline"}}><span onClick={e=>{e.stopPropagation();setO(!o)}} style={{color:"#6eb8ff",cursor:"help",borderBottom:"1px dotted #6eb8ff30",WebkitTapHighlightColor:"transparent"}}>{children||term} <span style={{fontSize:9,opacity:0.5}}>?</span></span>
     {o&&d&&<><div onClick={()=>setO(false)} style={{position:"fixed",inset:0,zIndex:999,background:"rgba(0,0,0,0.6)"}}/><div onClick={e=>e.stopPropagation()} style={{position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)",zIndex:1000,background:"#181828",border:"1px solid #2a2a4a",borderRadius:10,padding:"16px 18px",width:300,maxWidth:"88vw",fontSize:13,color:"#bbb",lineHeight:1.7,boxShadow:"0 10px 40px rgba(0,0,0,0.8)"}}><div style={{fontWeight:700,color:"#fff",marginBottom:6,fontSize:15}}>{term}</div>{d}<button onClick={()=>setO(false)} style={{display:"block",marginTop:10,background:"#252540",border:"none",color:"#ccc",padding:"6px 14px",borderRadius:5,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>Close</button></div></>}</span>);
+}
+
+function SourceTags({ keys, compact }) {
+  if (!keys || !keys.length) return null;
+  return (
+    <span style={{display:"inline-flex",flexWrap:"wrap",gap:3,marginLeft:compact?4:6,verticalAlign:"middle"}}>
+      {keys.map(k => {
+        const s = SOURCES[k];
+        if (!s) return null;
+        return (
+          <a key={k} href={s.u} target="_blank" rel="noopener noreferrer" title={s.f}
+            onClick={e=>e.stopPropagation()}
+            style={{fontSize:compact?8:9,padding:compact?"1px 5px":"2px 6px",borderRadius:3,background:"#1a1a2a",border:"1px solid #2a2a3a",color:"#8aa8c8",textDecoration:"none",fontFamily:"inherit",whiteSpace:"nowrap",cursor:"pointer"}}>
+            {s.l}
+          </a>
+        );
+      })}
+    </span>
+  );
 }
 
 function NCard({ node, active, affected, loopC, onClick, pulse, rippleKey, fs, isMobile }) {
@@ -199,13 +259,13 @@ function NCard({ node, active, affected, loopC, onClick, pulse, rippleKey, fs, i
 }
 
 const TOUR = [
-  { title: "What is Waste Colonialism?", body: "Every year, wealthy countries export over 35 million tonnes of waste to nations that lack the infrastructure to manage it. This isn't accidental — it's a system built on economic asymmetry, regulatory gaps, and deliberate industry strategy.\n\nThis interactive map lets you see how the system works and what happens when you change one part of it.", hl: null },
+  { title: "What is Waste Colonialism?", body: "Every year, wealthy countries export over 35 million tonnes of waste to nations that lack the infrastructure to manage it. This isn't accidental \u2014 it's a system built on economic asymmetry, regulatory gaps, and deliberate industry strategy.\n\nThis interactive map lets you see how the system works and what happens when you change one part of it.", hl: null },
   { title: "The Numbers Are Real", body: "Each box on this map is a real variable with real data from UN, World Bank, and investigative research.\n\nBlue = drivers. Yellow = flows. Purple = enablers. Green = governance. Pink = social. Red = impacts.\n\nThe small badge on each node shows how many other variables it directly affects.", hl: null },
-  { title: "431 Million Tonnes", body: "Global plastic production hit 431 megatonnes in 2024 and is on track for 590 Mt by 2050. Only 5–6% is actually recycled in the US. The rest has to go somewhere.\n\nSee the badge? This node affects 3 other parts of the system.", hl: "production" },
-  { title: "The Export Pipeline", body: "Waste Exports is the most connected node — it directly affects 6 other variables. When waste crosses a border, it simultaneously overwhelms governance, creates informal jobs, causes health damage, builds dependency, drives contamination, and fuels illegal dumping.\n\nThis is the critical transmission point of the whole system.", hl: "export_volume" },
+  { title: "431 Million Tonnes", body: "Global plastic production hit 431 megatonnes in 2024 and is on track for 590 Mt by 2050. Only 5\u20136% is actually recycled in the US. The rest has to go somewhere.\n\nSee the badge? This node affects 3 other parts of the system.", hl: "production" },
+  { title: "The Export Pipeline", body: "Waste Exports is the most connected node \u2014 it directly affects 6 other variables. When waste crosses a border, it simultaneously overwhelms governance, creates informal jobs, causes health damage, builds dependency, drives contamination, and fuels illegal dumping.\n\nThis is the critical transmission point of the whole system.", hl: "export_volume" },
   { title: "Where It Lands: Kenya", body: "Dandora dumpsite in Nairobi was declared full in 2001. It still receives 2,000+ tonnes daily. 1 million people live nearby. A UNEP study found 50% of children have toxic blood lead levels.\n\nThis is what 'Illegal Dumping at 70/100' looks like on the ground.", hl: "illegal_dumping" },
-  { title: "Try It: Move the Slider", body: "Close this guide and tap any box. A slider appears. Drag it — nodes that change will GROW in size, flash colored badges showing the exact %, pulse with ripples, and shift color.\n\nYou can also tap the ⛶ button above the map to go fullscreen for a bigger view.", hl: null },
-  { title: "Go Deeper", body: "Use the tabs to explore:\n\n• What If? — one-click scenarios (China's ban, treaty, AGOA)\n• Loops — 6 self-reinforcing cycles with animated flow arrows\n• Iceberg — hidden structures beneath surface events\n• Kenya — timeline, actors, waste streams, human impact\n• Glossary — every term explained", hl: null },
+  { title: "Try It: Move the Slider", body: "Close this guide and tap any box. A slider appears. Drag it \u2014 nodes that change will GROW in size, flash colored badges showing the exact %, pulse with ripples, and shift color.\n\nYou can also tap the \u26F6 button above the map to go fullscreen for a bigger view.", hl: null },
+  { title: "Go Deeper", body: "Use the tabs to explore:\n\n\u2022 What If? \u2014 one-click scenarios (China's ban, treaty, AGOA)\n\u2022 Loops \u2014 6 self-reinforcing cycles with animated flow arrows\n\u2022 Iceberg \u2014 hidden structures beneath surface events\n\u2022 Kenya \u2014 timeline, actors, waste streams, human impact\n\u2022 Glossary \u2014 every term explained", hl: null },
 ];
 
 export default function App() {
@@ -234,17 +294,13 @@ export default function App() {
     return () => { document.body.style.overflow = ""; };
   }, [fullscreen]);
 
-  // FIX: Escape key closes fullscreen and tour
+  // FIX #6: Escape key exits fullscreen
   useEffect(() => {
-    const onKey = (e) => {
-      if (e.key === "Escape") {
-        if (fullscreen) setFullscreen(false);
-        else if (showTour) setShowTour(false);
-      }
-    };
+    if (!fullscreen) return;
+    const onKey = (e) => { if (e.key === "Escape") setFullscreen(false); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [fullscreen, showTour]);
+  }, [fullscreen]);
 
   const isTablet = vw >= 768;
   const isDesktop = vw >= 1024;
@@ -256,29 +312,23 @@ export default function App() {
   const reset = () => { setNodes(NODES.map(n => ({...n}))); setManip(null); setSlider(100); setScenario(null); };
   const pick = id => { setManip(id); setSlider(100); setScenario(null); setNodes(NODES.map(n => ({...n}))); };
 
-  // FIX: Compute all scenario deltas against base first, then apply — prevents order-dependent compounding
+  // FIX #4: compute all cascade deltas against base, then apply once (order-independent)
   const runScenario = sc => {
     if (sc.id === "baseline") { reset(); return; }
-    setScenario(sc.id);
-    setManip(null);
+    setScenario(sc.id); setManip(null);
     const final = {};
-    NODES.forEach(n => { final[n.id] = sc.changes[n.id] ?? n.base; });
-    // Collect all cascade deltas first (against base), then apply in one pass
+    NODES.forEach(n => final[n.id] = sc.changes[n.id] ?? n.base);
     const deltas = {};
     Object.entries(sc.changes).forEach(([sid, sv]) => {
-      const src = NODES.find(n => n.id === sid);
-      if (!src?.sensitivity) return;
+      const src = NODES.find(n => n.id === sid); if (!src?.sensitivity) return;
       Object.entries(src.sensitivity).forEach(([tid, sens]) => {
-        if (sc.changes[tid] !== undefined) return; // explicit overrides always win
-        const tn = NODES.find(n => n.id === tid);
-        if (!tn) return;
-        const delta = (sv / src.base - 1) * sens * 0.4;
-        deltas[tid] = (deltas[tid] || 0) + delta; // sum deltas from multiple sources
+        if (sc.changes[tid] !== undefined) return;
+        const tn = NODES.find(n => n.id === tid); if (!tn) return;
+        deltas[tid] = (deltas[tid] || 0) + (sv / src.base - 1) * sens * 0.4;
       });
     });
     Object.entries(deltas).forEach(([tid, d]) => {
-      const tn = NODES.find(n => n.id === tid);
-      if (!tn) return;
+      const tn = NODES.find(n => n.id === tid); if (!tn) return;
       final[tid] = Math.max(0, tn.base * (1 + d));
     });
     setNodes(NODES.map(n => ({...n, value: final[n.id] ?? n.base})));
@@ -293,7 +343,7 @@ export default function App() {
   const tourHL = showTour ? TOUR[ts]?.hl : null;
   const hasHL = !!tourHL;
 
-  // FIX: use 100dvh to avoid iOS Safari URL bar cutoff
+  // FIX: use 100dvh in fullscreen so iOS URL bar doesn't cut the map
   const mapHeight = fullscreen
     ? "calc(100dvh - 130px)"
     : isDesktop ? 640 : isTablet ? 600 : 520;
@@ -313,7 +363,7 @@ export default function App() {
           const t = nodes.find(n => n.id === tid); if (!t) return null;
           const pos = s > 0;
           const sx = compressX(mn.x), tx = compressX(t.x);
-          return (<g key={tid}><line x1={`${sx}%`} y1={`${mn.y}%`} x2={`${tx}%`} y2={`${t.y}%`} stroke={pos?"#ff444440":"#44cc8840"} strokeWidth={Math.abs(s)*2.5+0.5} strokeDasharray="4,3" markerEnd={pos?"url(#mr)":"url(#mg)"}/><text x={`${(sx+tx)/2}%`} y={`${(mn.y+t.y)/2}%`} fill={pos?"#ff4444":"#44cc88"} fontSize="11" fontWeight="700" textAnchor="middle" dy="-3">{pos?"+":"−"}</text></g>);
+          return (<g key={tid}><line x1={`${sx}%`} y1={`${mn.y}%`} x2={`${tx}%`} y2={`${t.y}%`} stroke={pos?"#ff444440":"#44cc8840"} strokeWidth={Math.abs(s)*2.5+0.5} strokeDasharray="4,3" markerEnd={pos?"url(#mr)":"url(#mg)"}/><text x={`${(sx+tx)/2}%`} y={`${(mn.y+t.y)/2}%`} fill={pos?"#ff4444":"#44cc88"} fontSize="11" fontWeight="700" textAnchor="middle" dy="-3">{pos?"+":"\u2212"}</text></g>);
         })}
         {lp && lp.nodes.map((nid, i) => {
           const from = NODES.find(n => n.id === nid);
@@ -343,9 +393,9 @@ export default function App() {
       </div>
       <input type="range" min={10} max={300} value={slider} onChange={e=>onSlider(+e.target.value)} style={{width:"100%",touchAction:"pan-x"}} />
       <div style={{position:"relative",height:14,fontSize:9,color:"#3a3a4a",marginTop:2}}>
-        <span style={{position:"absolute",left:0}}>▼ 10%</span>
+        <span style={{position:"absolute",left:0}}>{"\u25BC"} 10%</span>
         <span style={{position:"absolute",left:"31%",transform:"translateX(-50%)",color:"#666"}}>|100%</span>
-        <span style={{position:"absolute",right:0}}>300% ▲</span>
+        <span style={{position:"absolute",right:0}}>300% {"\u25B2"}</span>
       </div>
       {mn?.ix&&<div style={{fontSize:10,color:"#555",marginTop:5,padding:"4px 8px",background:"#08080d",borderRadius:4}}>{mn.ix}</div>}
     </div>
@@ -353,18 +403,18 @@ export default function App() {
     <div style={{background:"#0c0c14",border:"1px solid #111118",borderRadius:8,padding:"8px 12px",marginBottom:8,fontSize:11,color:"#555"}}>Tap any node. Watch it and its connections <span style={{color:"#ff5555"}}>grow</span>/<span style={{color:"#44dd88"}}>shrink</span> and flash % badges.</div>
   );
 
-  // FIX: fullscreen style block now includes html,body background
   if (fullscreen) {
     return (
       <div style={{position:"fixed",inset:0,zIndex:5000,background:"#08080d",color:"#d8d5cc",fontFamily:"'Fira Code',monospace",display:"flex",flexDirection:"column"}}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600;700&family=Playfair+Display:wght@400;700;900&display=swap');*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}html,body{background:#08080d;touch-action:manipulation;-webkit-text-size-adjust:100%;min-height:100vh}input[type=range]{-webkit-appearance:none;height:5px;border-radius:3px;outline:none;background:linear-gradient(90deg,#44cc88 0%,#44cc88 31%,#444 31%,#444 32%,#ff4444 100%);touch-action:pan-x}input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;cursor:pointer;border:3px solid #08080d;box-shadow:0 0 8px rgba(255,255,255,0.2)}input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:#fff;cursor:pointer;border:3px solid #08080d}@keyframes ripple{0%{opacity:0.9;transform:scale(1)}100%{opacity:0;transform:scale(1.6)}}@keyframes badgePop{0%{opacity:0;transform:scale(0.3) translateX(-50%)}70%{transform:scale(1.15) translateX(-50%)}100%{opacity:1;transform:scale(1) translateX(-50%)}}@keyframes flowDash{to{stroke-dashoffset:-20}}@keyframes loopGlow{0%,100%{opacity:0.35}50%{opacity:0.9}}@keyframes pulse{0%,100%{box-shadow:0 0 10px var(--pc,#4488ff33)}50%{box-shadow:0 0 28px var(--pc,#4488ff55),0 0 56px var(--pc,#4488ff22)}}`}</style>
+        {/* FIX #1: html/body background in fullscreen too */}
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600;700&family=Playfair+Display:wght@400;700;900&display=swap');html,body{background:#08080d;min-height:100vh}*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}input[type=range]{-webkit-appearance:none;height:5px;border-radius:3px;outline:none;background:linear-gradient(90deg,#44cc88 0%,#44cc88 31%,#444 31%,#444 32%,#ff4444 100%);touch-action:pan-x}input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;cursor:pointer;border:3px solid #08080d;box-shadow:0 0 8px rgba(255,255,255,0.2)}input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:#fff;cursor:pointer;border:3px solid #08080d}@keyframes ripple{0%{opacity:0.9;transform:scale(1)}100%{opacity:0;transform:scale(1.6)}}@keyframes badgePop{0%{opacity:0;transform:scale(0.3) translateX(-50%)}70%{transform:scale(1.15) translateX(-50%)}100%{opacity:1;transform:scale(1) translateX(-50%)}}@keyframes flowDash{to{stroke-dashoffset:-20}}@keyframes loopGlow{0%,100%{opacity:0.35}50%{opacity:0.9}}@keyframes pulse{0%,100%{box-shadow:0 0 10px var(--pc,#4488ff33)}50%{box-shadow:0 0 28px var(--pc,#4488ff55),0 0 56px var(--pc,#4488ff22)}}`}</style>
         <div style={{padding:"10px 14px",borderBottom:"1px solid #151520",display:"flex",alignItems:"center",gap:10}}>
-          <button onClick={()=>setFullscreen(false)} style={{background:"#1a1a28",border:"1px solid #252540",color:"#ccc",padding:"7px 14px",borderRadius:6,fontSize:12,cursor:"pointer",fontFamily:"inherit",minHeight:36,WebkitTapHighlightColor:"transparent",fontWeight:500}}>✕ Close</button>
+          <button onClick={()=>setFullscreen(false)} style={{background:"#1a1a28",border:"1px solid #252540",color:"#ccc",padding:"7px 14px",borderRadius:6,fontSize:12,cursor:"pointer",fontFamily:"inherit",minHeight:36,WebkitTapHighlightColor:"transparent",fontWeight:500}}>{"\u2715"} Close</button>
           <div style={{flex:1}}>
             <div style={{fontSize:9,color:"#ff4444",textTransform:"uppercase",letterSpacing:3}}>Fullscreen Map</div>
             <div style={{fontSize:14,fontWeight:700,color:"#fff",fontFamily:"'Playfair Display',serif"}}>Waste Neocolonialism</div>
           </div>
-          {loop && <button onClick={()=>setLoop(null)} style={{background:lp.color+"18",border:`1px solid ${lp.color}40`,color:lp.color,padding:"5px 10px",borderRadius:5,fontSize:11,cursor:"pointer",fontFamily:"inherit",fontWeight:500}}>{lp.icon} {loop} ✕</button>}
+          {loop && <button onClick={()=>setLoop(null)} style={{background:lp.color+"18",border:`1px solid ${lp.color}40`,color:lp.color,padding:"5px 10px",borderRadius:5,fontSize:11,cursor:"pointer",fontFamily:"inherit",fontWeight:500}}>{lp.icon} {loop} {"\u2715"}</button>}
         </div>
         <div style={{padding:"10px 14px 6px"}}>{renderControl()}</div>
         <div style={{flex:1,padding:"0 4px 10px",overflow:"hidden"}}>{renderMap()}</div>
@@ -374,13 +424,13 @@ export default function App() {
 
   return (
     <div style={{background:"#08080d",color:"#d8d5cc",fontFamily:"'Fira Code',monospace",minHeight:"100vh",maxWidth:isDesktop?1200:"100%",margin:"0 auto"}}>
-      {/* FIX: html,body now has dark background so MacBook wide screens don't show white edges */}
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600;700&family=Playfair+Display:wght@400;700;900&display=swap');*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}html,body{background:#08080d;min-height:100vh;-webkit-text-size-adjust:100%;text-size-adjust:100%;touch-action:manipulation}::-webkit-scrollbar{width:6px}::-webkit-scrollbar-thumb{background:#222;border-radius:4px}input[type=range]{-webkit-appearance:none;height:5px;border-radius:3px;outline:none;background:linear-gradient(90deg,#44cc88 0%,#44cc88 31%,#444 31%,#444 32%,#ff4444 100%);touch-action:pan-x}input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;cursor:pointer;border:3px solid #08080d;box-shadow:0 0 8px rgba(255,255,255,0.2)}input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:#fff;cursor:pointer;border:3px solid #08080d}button{font-family:inherit;-webkit-tap-highlight-color:transparent}.fi{animation:fi .25s ease}@keyframes fi{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}@keyframes pulse{0%,100%{box-shadow:0 0 10px var(--pc,#4488ff33)}50%{box-shadow:0 0 28px var(--pc,#4488ff55),0 0 56px var(--pc,#4488ff22)}}@keyframes ripple{0%{opacity:0.9;transform:scale(1)}100%{opacity:0;transform:scale(1.6)}}@keyframes badgePop{0%{opacity:0;transform:scale(0.3) translateX(-50%)}70%{transform:scale(1.15) translateX(-50%)}100%{opacity:1;transform:scale(1) translateX(-50%)}}@keyframes flowDash{to{stroke-dashoffset:-20}}@keyframes loopGlow{0%,100%{opacity:0.35}50%{opacity:0.9}}`}</style>
+      {/* FIX #1: html/body background so MacBook wide screens no longer show white edges outside the 1200px cap */}
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600;700&family=Playfair+Display:wght@400;700;900&display=swap');html,body{background:#08080d;min-height:100vh}*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}html{-webkit-text-size-adjust:100%;text-size-adjust:100%}body{touch-action:manipulation}::-webkit-scrollbar{width:6px}::-webkit-scrollbar-thumb{background:#222;border-radius:4px}input[type=range]{-webkit-appearance:none;height:5px;border-radius:3px;outline:none;background:linear-gradient(90deg,#44cc88 0%,#44cc88 31%,#444 31%,#444 32%,#ff4444 100%);touch-action:pan-x}input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;cursor:pointer;border:3px solid #08080d;box-shadow:0 0 8px rgba(255,255,255,0.2)}input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:#fff;cursor:pointer;border:3px solid #08080d}button{font-family:inherit;-webkit-tap-highlight-color:transparent}.fi{animation:fi .25s ease}@keyframes fi{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}@keyframes pulse{0%,100%{box-shadow:0 0 10px var(--pc,#4488ff33)}50%{box-shadow:0 0 28px var(--pc,#4488ff55),0 0 56px var(--pc,#4488ff22)}}@keyframes ripple{0%{opacity:0.9;transform:scale(1)}100%{opacity:0;transform:scale(1.6)}}@keyframes badgePop{0%{opacity:0;transform:scale(0.3) translateX(-50%)}70%{transform:scale(1.15) translateX(-50%)}100%{opacity:1;transform:scale(1) translateX(-50%)}}@keyframes flowDash{to{stroke-dashoffset:-20}}@keyframes loopGlow{0%,100%{opacity:0.35}50%{opacity:0.9}}`}</style>
 
-      {/* FIX: Tour overlay is now transparent + non-blocking when a node is highlighted, so you can see the pulsing node */}
+      {/* FIX #2: tour backdrop becomes transparent when highlighting a node so the pulsing node is visible */}
       {showTour && (
         <div style={{position:"fixed",inset:0,zIndex:2000,display:"flex",flexDirection:"column",justifyContent:hasHL?"flex-end":"center",alignItems:"center",background:hasHL?"transparent":"rgba(0,0,0,0.78)",padding:hasHL?"8px 12px 14px":"16px",transition:"background 0.4s",pointerEvents:hasHL?"none":"auto"}}>
-          <div style={{background:"#141420",border:"1px solid #2a2a4a",borderRadius:14,padding:"20px 22px",maxWidth:420,width:"100%",boxShadow:"0 16px 64px rgba(0,0,0,0.8)",pointerEvents:"auto"}}>
+          <div style={{background:"#141420",border:"1px solid #2a2a4a",borderRadius:14,padding:"20px 22px",maxWidth:420,width:"100%",boxShadow:hasHL?"0 16px 64px rgba(0,0,0,0.95), 0 0 0 1px rgba(255,68,68,0.3)":"0 16px 64px rgba(0,0,0,0.8)",pointerEvents:"auto"}}>
             <div style={{display:"flex",gap:4,marginBottom:10}}>{TOUR.map((_,i)=>(<div key={i} style={{flex:1,height:3,borderRadius:2,background:i<ts?"#ff4444":i===ts?"#ff4444":i===ts+1?"#ff444440":"#1a1a2a"}}/>))}</div>
             <div style={{fontSize:9,color:"#ff4444",textTransform:"uppercase",letterSpacing:3,marginBottom:5}}>{ts+1} / {TOUR.length}</div>
             <div style={{fontSize:19,fontWeight:700,color:"#fff",fontFamily:"'Playfair Display',serif",marginBottom:8,lineHeight:1.2}}>{TOUR[ts].title}</div>
@@ -389,7 +439,7 @@ export default function App() {
               <button onClick={()=>setShowTour(false)} style={{background:"none",border:"none",color:"#555",fontSize:12,cursor:"pointer",fontFamily:"inherit",padding:"6px 8px",minHeight:36}}>Skip</button>
               <div style={{display:"flex",gap:8}}>
                 {ts>0&&<button onClick={()=>setTs(ts-1)} style={{background:"#1a1a2a",border:"1px solid #252540",color:"#aaa",padding:"8px 14px",borderRadius:6,fontSize:12,cursor:"pointer",fontFamily:"inherit",minHeight:36}}>Back</button>}
-                <button onClick={()=>{if(ts<TOUR.length-1)setTs(ts+1);else setShowTour(false)}} style={{background:"#ff4444",border:"none",color:"#fff",padding:"8px 18px",borderRadius:6,fontSize:13,cursor:"pointer",fontFamily:"inherit",fontWeight:600,minHeight:36}}>{ts<TOUR.length-1?"Next →":"Start →"}</button>
+                <button onClick={()=>{if(ts<TOUR.length-1)setTs(ts+1);else setShowTour(false)}} style={{background:"#ff4444",border:"none",color:"#fff",padding:"8px 18px",borderRadius:6,fontSize:13,cursor:"pointer",fontFamily:"inherit",fontWeight:600,minHeight:36}}>{ts<TOUR.length-1?"Next \u2192":"Start \u2192"}</button>
               </div>
             </div>
           </div>
@@ -404,22 +454,22 @@ export default function App() {
           </div>
           <button onClick={()=>{setShowTour(true);setTs(0)}} style={{background:"#ff444415",border:"1px solid #ff444430",color:"#ff6666",padding:"6px 12px",borderRadius:6,fontSize:11,cursor:"pointer",fontFamily:"inherit",fontWeight:500,minHeight:34,flexShrink:0}}>? Guide</button>
         </div>
-        {/* FIX: use real unicode characters in JSX text instead of bare \u escape sequences */}
-        <p style={{fontSize:11,color:"#555",marginTop:5}}>Tap nodes → drag slider → watch cascade. <Tip term="Index (0–100)">Indexes</Tip> · <Tip term="Cascade (3 levels)">Propagation</Tip></p>
+        {/* FIX #3: \u00b7 wrapped in braces so it renders as · instead of literal backslash-u */}
+        <p style={{fontSize:11,color:"#555",marginTop:5}}>Tap nodes {"\u2192"} drag slider {"\u2192"} watch cascade. <Tip term={"Index (0\u2013100)"}>Indexes</Tip> {"\u00b7"} <Tip term="Cascade (3 levels)">Propagation</Tip></p>
       </div>
 
       <div style={{display:"flex",borderBottom:"1px solid #111118",overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
-        {[{id:"system",l:"System Map"},{id:"scenarios",l:"What If?"},{id:"kenya",l:"Kenya"},{id:"loops",l:"Loops"},{id:"iceberg",l:"Iceberg"},{id:"glossary",l:"Glossary"}].map(v=>(<button key={v.id} onClick={()=>setView(v.id)} style={{background:"none",border:"none",borderBottom:view===v.id?"2px solid #ff4444":"2px solid transparent",color:view===v.id?"#fff":"#555",padding:"11px 14px",fontSize:12,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap",minHeight:42,fontWeight:view===v.id?600:400}}>{v.l}</button>))}
+        {[{id:"system",l:"System Map"},{id:"scenarios",l:"What If?"},{id:"kenya",l:"Kenya"},{id:"loops",l:"Loops"},{id:"iceberg",l:"Iceberg"},{id:"glossary",l:"Glossary"},{id:"sources",l:"Sources"}].map(v=>(<button key={v.id} onClick={()=>setView(v.id)} style={{background:"none",border:"none",borderBottom:view===v.id?"2px solid #ff4444":"2px solid transparent",color:view===v.id?"#fff":"#555",padding:"11px 14px",fontSize:12,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap",minHeight:42,fontWeight:view===v.id?600:400}}>{v.l}</button>))}
       </div>
 
       <div style={{padding:isTablet?16:12}}>
         {view==="system"&&(<div className="fi">
           {renderControl()}
-          {loop&&<div style={{display:"flex",gap:4,marginBottom:8,alignItems:"center",padding:"6px 11px",background:lp.color+"12",borderRadius:6,border:`1px solid ${lp.color}30`}}><span style={{fontSize:11,color:lp.color,fontWeight:600}}>{lp.icon} {loop}: {lp.name}</span><span style={{fontSize:10,color:"#666",marginLeft:5}}>— flow arrows shown below</span><button onClick={()=>setLoop(null)} style={{background:"none",border:"none",color:"#666",fontSize:14,cursor:"pointer",marginLeft:"auto",padding:"2px 6px",minHeight:28}}>✕</button></div>}
+          {loop&&<div style={{display:"flex",gap:4,marginBottom:8,alignItems:"center",padding:"6px 11px",background:lp.color+"12",borderRadius:6,border:`1px solid ${lp.color}30`}}><span style={{fontSize:11,color:lp.color,fontWeight:600}}>{lp.icon} {loop}: {lp.name}</span><span style={{fontSize:10,color:"#666",marginLeft:5}}>{"\u2014"} flow arrows shown below</span><button onClick={()=>setLoop(null)} style={{background:"none",border:"none",color:"#666",fontSize:14,cursor:"pointer",marginLeft:"auto",padding:"2px 6px",minHeight:28}}>{"\u2715"}</button></div>}
           <div style={{position:"relative"}}>
             {renderMap()}
             <button onClick={()=>setFullscreen(true)} style={{position:"absolute",top:10,right:10,zIndex:50,background:"rgba(20,20,32,0.92)",border:"1px solid #2a2a40",color:"#ccc",padding:"8px 10px",borderRadius:6,fontSize:14,cursor:"pointer",fontFamily:"inherit",minHeight:38,WebkitBackdropFilter:"blur(4px)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",gap:5}} title="Expand to fullscreen">
-              <span style={{fontSize:14}}>⛶</span>
+              <span style={{fontSize:14}}>{"\u26F6"}</span>
               <span style={{fontSize:10}}>Expand</span>
             </button>
           </div>
@@ -429,7 +479,8 @@ export default function App() {
               <span style={{fontSize:9,color:CC[mn.category],textTransform:"uppercase",letterSpacing:2,background:CC[mn.category]+"12",padding:"2px 6px",borderRadius:3}}>{mn.category}</span>
               <div style={{fontSize:14,fontWeight:700,color:"#fff",marginTop:5,marginBottom:4}}>{mn.label.replace('\n',' ')}</div>
               <div style={{fontSize:11,color:"#888",lineHeight:1.7}}>{mn.desc}</div>
-              {mn.sensitivity&&<div style={{marginTop:8,display:"flex",flexWrap:"wrap",gap:4}}>{Object.entries(mn.sensitivity).map(([id,s])=>{const t=NODES.find(n=>n.id===id);return t?(<span key={id} style={{fontSize:10,padding:"2px 7px",borderRadius:3,background:s>0?"#ff444412":"#44cc8812",color:s>0?"#ff6666":"#44dd88"}}>{s>0?"↑":"↓"} {t.label.replace('\n',' ')} {Math.abs(s*100)}%</span>):null})}</div>}
+              {mn.sources && mn.sources.length > 0 && <div style={{marginTop:7,display:"flex",alignItems:"center",flexWrap:"wrap",gap:4}}><span style={{fontSize:9,color:"#444",textTransform:"uppercase",letterSpacing:1}}>Sources:</span><SourceTags keys={mn.sources}/></div>}
+              {mn.sensitivity&&<div style={{marginTop:8,display:"flex",flexWrap:"wrap",gap:4}}>{Object.entries(mn.sensitivity).map(([id,s])=>{const t=NODES.find(n=>n.id===id);return t?(<span key={id} style={{fontSize:10,padding:"2px 7px",borderRadius:3,background:s>0?"#ff444412":"#44cc8812",color:s>0?"#ff6666":"#44dd88"}}>{s>0?"\u2191":"\u2193"} {t.label.replace('\n',' ')} {Math.abs(s*100)}%</span>):null})}</div>}
             </div>
           )}
 
@@ -438,7 +489,7 @@ export default function App() {
 
         {view==="scenarios"&&(<div className="fi">
           <div style={{fontSize:10,color:"#ff4444",textTransform:"uppercase",letterSpacing:3,marginBottom:6}}>What-If Scenarios</div>
-          <p style={{fontSize:12,color:"#555",marginBottom:12,lineHeight:1.6}}>Tap a scenario — the system map will show every affected node growing, shrinking, and flashing its change.</p>
+          <p style={{fontSize:12,color:"#555",marginBottom:12,lineHeight:1.6}}>Tap a scenario {"\u2014"} the system map will show every affected node growing, shrinking, and flashing its change.</p>
           {SCENARIOS.map(sc=>(<button key={sc.id} onClick={()=>{runScenario(sc);setView("system")}} style={{display:"block",width:"100%",textAlign:"left",background:"#0a0a0f",border:`1px solid ${scenario===sc.id?"#ff444430":"#111118"}`,borderRadius:8,padding:"12px 14px",marginBottom:7,cursor:"pointer",fontFamily:"inherit",minHeight:60}}>
             <div style={{fontSize:14,fontWeight:600,color:"#fff"}}>{sc.name}</div>
             <div style={{fontSize:11,color:"#666",marginTop:2}}>{sc.desc}</div>
@@ -458,8 +509,8 @@ export default function App() {
               {l:"E-waste (2024)",v:"53,559",u:"tonnes",c:"#ffaa22"},
               {l:"Mitumba imports",v:"200K",u:"tonnes/yr",c:"#aa66ff"},
               {l:"Children with toxic lead",v:"50",u:"% near Dandora",c:"#ff66aa"},
-              {l:"Formal recycling",v:"4–5",u:"%",c:"#4488ff"},
-              {l:"Textile waste",v:"30–40",u:"% of imports",c:"#aa66ff"},
+              {l:"Formal recycling",v:"4\u20135",u:"%",c:"#4488ff"},
+              {l:"Textile waste",v:"30\u201340",u:"% of imports",c:"#aa66ff"},
               {l:"AGOA at risk",v:"$470M",u:"annually",c:"#ffaa22"},
             ].map((s,i)=>(<div key={i} style={{background:"#0c0c14",border:`1px solid ${s.c}18`,borderRadius:7,padding:"10px 8px",textAlign:"center"}}>
               <div style={{fontSize:isTablet?22:18,fontWeight:700,color:s.c,fontFamily:"'Playfair Display',serif"}}>{s.v}</div>
@@ -475,10 +526,10 @@ export default function App() {
             <div style={{display:"grid",gridTemplateColumns:`repeat(auto-fill,minmax(${isTablet?180:140}px,1fr))`,gap:6}}>
               {[
                 {l:"Blood lead > threshold",v:"50%",d:"of children tested"},
-                {l:"Soil lead",v:"13,500 ppm",d:"90× safe limit"},
-                {l:"Soil cadmium",v:"1,058 ppm",d:"212× safe limit"},
-                {l:"Soil mercury",v:"46.7 ppm",d:"23× WHO limit"},
-                {l:"Pica symptoms",v:"25–30%",d:"of children — lead poisoning"},
+                {l:"Soil lead",v:"13,500 ppm",d:"90\u00d7 safe limit"},
+                {l:"Soil cadmium",v:"1,058 ppm",d:"212\u00d7 safe limit"},
+                {l:"Soil mercury",v:"46.7 ppm",d:"23\u00d7 WHO limit"},
+                {l:"Pica symptoms",v:"25\u201330%",d:"of children \u2014 lead poisoning"},
                 {l:"Respiratory disease",v:"~50%",d:"of children nearby"},
               ].map((x,i)=>(<div key={i} style={{background:"#08080d",border:"1px solid #1a1a28",borderRadius:6,padding:"8px 10px"}}>
                 <div style={{fontSize:9,color:"#666"}}>{x.l}</div>
@@ -486,8 +537,9 @@ export default function App() {
                 <div style={{fontSize:9,color:"#444"}}>{x.d}</div>
               </div>))}
             </div>
+            <div style={{marginTop:10,display:"flex",alignItems:"center",flexWrap:"wrap",gap:5}}><span style={{fontSize:9,color:"#ff444488",textTransform:"uppercase",letterSpacing:1}}>Sources:</span><SourceTags keys={["unep07","un_news07","hrr","wb24"]} compact/></div>
             <div style={{marginTop:10,padding:"8px 12px",background:"#ff444410",borderLeft:"3px solid #ff4444",borderRadius:4,fontSize:11,color:"#bbb",lineHeight:1.7}}>
-              In February 2026, Kenyan courts awarded KSh 25.8 million to 1,032 waste pickers, finding that Nairobi County and NEMA had jointly violated their constitutional rights. Compensation remains unpaid.
+              In February 2026, Kenyan courts awarded KSh 25.8 million to 1,032 waste pickers, finding that Nairobi County and NEMA had jointly violated their constitutional rights. Compensation remains unpaid.<SourceTags keys={["kenyans_epr"]} compact/>
             </div>
           </div>
 
@@ -503,6 +555,7 @@ export default function App() {
                 <div style={{fontSize:11,color:s.color,fontWeight:700,whiteSpace:"nowrap",background:s.color+"15",padding:"3px 8px",borderRadius:4}}>{s.volume}</div>
               </div>
               <div style={{fontSize:11,color:"#888",lineHeight:1.7}}>{s.detail}</div>
+              {s.sources && s.sources.length>0 && <div style={{marginTop:6}}><SourceTags keys={s.sources} compact/></div>}
             </div>))}
           </div>
 
@@ -512,7 +565,7 @@ export default function App() {
             {KENYA_TIMELINE.map((t,i)=>(<div key={i} style={{display:"flex",gap:12,marginBottom:i===KENYA_TIMELINE.length-1?0:12,position:"relative"}}>
               <div style={{width:isTablet?68:48,fontSize:isTablet?14:12,fontWeight:700,color:t.color,fontFamily:"'Playfair Display',serif",flexShrink:0,paddingTop:2}}>{t.year}</div>
               <div style={{width:14,flexShrink:0,display:"flex",justifyContent:"center",paddingTop:6}}><div style={{width:10,height:10,borderRadius:5,background:t.color,border:"2px solid #0c0c14",boxShadow:`0 0 0 2px ${t.color}40`}}/></div>
-              <div style={{fontSize:11,color:"#999",lineHeight:1.6,paddingTop:3,flex:1}}>{t.event}</div>
+              <div style={{fontSize:11,color:"#999",lineHeight:1.6,paddingTop:3,flex:1}}>{t.event}{t.sources && t.sources.length>0 && <div style={{marginTop:4}}><SourceTags keys={t.sources} compact/></div>}</div>
             </div>))}
           </div>
 
@@ -525,24 +578,26 @@ export default function App() {
                 <div style={{fontSize:8,color:a.color,marginLeft:"auto",textTransform:"uppercase",letterSpacing:1,background:a.color+"10",padding:"1px 6px",borderRadius:2}}>{a.side}</div>
               </div>
               <div style={{fontSize:10,color:"#777",lineHeight:1.7}}>{a.role}</div>
+              {a.sources && a.sources.length>0 && <div style={{marginTop:5}}><SourceTags keys={a.sources} compact/></div>}
             </div>))}
           </div>
 
           <div style={{fontSize:10,color:"#ff4444",textTransform:"uppercase",letterSpacing:2.5,marginBottom:8}}>Connecting the Dots</div>
           <div style={{background:"#0c0c14",border:"1px solid #111118",borderRadius:8,padding:"12px 14px",marginBottom:16}}>
             {[
-              {from:"ACC Lobbying (2020)",to:"Kenya FTA push",link:"FOIA documents revealed ACC wanted Kenya as 'hub' and 'foothold' for US plastics across Africa via AfCFTA"},
-              {from:"AGOA Threats",to:"EAC Clothing Ban Collapse",link:"Kenya withdrew from ban in 2017 after US threatened to revoke $470M+ in trade preferences. Rwanda defied — got punished."},
-              {from:"China National Sword (2018)",to:"Africa waste surge",link:"After China's 99% import cut, plastic exports to Africa quadrupled in 2019. Kenya's position as East African hub made it a primary target."},
-              {from:"30–40% Textile Waste",to:"Nairobi River Contamination",link:"Unsellable synthetic mitumba from Gikomba accumulates along riverbanks. Two-thirds is plastic fiber that will never biodegrade."},
-              {from:"Court Orders (2021)",to:"Dandora Still Open",link:"Justice Bor ordered closure. Ignored for 5 years. No alternative site. KSh 4B relocation cost. Cartel control. Overlapping mandates."},
+              {from:"ACC Lobbying (2020)",to:"Kenya FTA push",link:"FOIA documents revealed ACC wanted Kenya as 'hub' and 'foothold' for US plastics across Africa via AfCFTA",sources:["acc_foia","gp_africa_acc"]},
+              {from:"AGOA Threats",to:"EAC Clothing Ban Collapse",link:"Kenya withdrew from ban in 2017 after US threatened to revoke $470M+ in trade preferences. Rwanda defied \u2014 got punished.",sources:["qz_rw","foreign_policy"]},
+              {from:"China National Sword (2018)",to:"Africa waste surge",link:"After China's 99% import cut, plastic exports to Africa quadrupled in 2019. Kenya's position as East African hub made it a primary target.",sources:["intercept"]},
+              {from:"30\u201340% Textile Waste",to:"Nairobi River Contamination",link:"Unsellable synthetic mitumba from Gikomba accumulates along riverbanks. Two-thirds is plastic fiber that will never biodegrade.",sources:["cm_trash","lampoon","conv_riv"]},
+              {from:"Court Orders (2021)",to:"Dandora Still Open",link:"Justice Bor ordered closure. Ignored for 5 years. No alternative site. KSh 4B relocation cost. Cartel control. Overlapping mandates.",sources:["standard21","gi_cor"]},
             ].map((c,i)=>(<div key={i} style={{marginBottom:i===4?0:8,padding:"9px 11px",background:"#08080d",borderRadius:5,borderLeft:"2px solid #ff4444"}}>
               <div style={{fontSize:11,display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
                 <span style={{color:"#ffaa22",fontWeight:600}}>{c.from}</span>
-                <span style={{color:"#444"}}>→</span>
+                <span style={{color:"#444"}}>{"\u2192"}</span>
                 <span style={{color:"#ff4444",fontWeight:600}}>{c.to}</span>
               </div>
               <div style={{fontSize:10,color:"#666",marginTop:4,lineHeight:1.6}}>{c.link}</div>
+              {c.sources && <div style={{marginTop:5}}><SourceTags keys={c.sources} compact/></div>}
             </div>))}
           </div>
 
@@ -572,9 +627,9 @@ export default function App() {
             <div className="fi" style={{background:"#0c0c14",border:`1px solid ${lpl.color}25`,borderRadius:8,padding:14}}>
               <div style={{fontSize:16,fontWeight:700,color:lpl.color,fontFamily:"'Playfair Display',serif",marginBottom:4}}>{lpl.icon} {lpl.id}: {lpl.name}</div>
               <div style={{fontSize:11,color:"#777",lineHeight:1.7,marginBottom:10}}>{lpl.desc}</div>
-              <div style={{display:"flex",flexWrap:"wrap",gap:3,alignItems:"center",marginBottom:10}}>{lpl.nodes.map((nid,i)=>{const nd=NODES.find(n=>n.id===nid);return nd?(<div key={`${nid}-${i}`} style={{display:"flex",alignItems:"center",gap:3}}><span style={{padding:"3px 8px",background:lpl.color+"15",border:`1px solid ${lpl.color}30`,borderRadius:4,fontSize:10,color:lpl.color}}>{nd.label.replace('\n',' ')}</span>{i<lpl.nodes.length-1&&<span style={{color:lpl.color,fontSize:12}}>→</span>}</div>):null})}<span style={{fontSize:11,color:lpl.color,marginLeft:3}}>↻</span></div>
-              <div style={{padding:"9px 11px",background:"#08080d",borderRadius:5,borderLeft:`2px solid ${lpl.color}`,fontSize:11,color:"#888",lineHeight:1.7}}>{lpl.ev}</div>
-              <button onClick={()=>setView("system")} style={{marginTop:10,background:lpl.color+"18",border:`1px solid ${lpl.color}40`,color:lpl.color,padding:"7px 14px",borderRadius:5,fontSize:11,cursor:"pointer",fontFamily:"inherit",fontWeight:600,minHeight:36}}>View on Map →</button>
+              <div style={{display:"flex",flexWrap:"wrap",gap:3,alignItems:"center",marginBottom:10}}>{lpl.nodes.map((nid,i)=>{const nd=NODES.find(n=>n.id===nid);return nd?(<div key={`${nid}-${i}`} style={{display:"flex",alignItems:"center",gap:3}}><span style={{padding:"3px 8px",background:lpl.color+"15",border:`1px solid ${lpl.color}30`,borderRadius:4,fontSize:10,color:lpl.color}}>{nd.label.replace('\n',' ')}</span>{i<lpl.nodes.length-1&&<span style={{color:lpl.color,fontSize:12}}>{"\u2192"}</span>}</div>):null})}<span style={{fontSize:11,color:lpl.color,marginLeft:3}}>{"\u21BB"}</span></div>
+              <div style={{padding:"9px 11px",background:"#08080d",borderRadius:5,borderLeft:`2px solid ${lpl.color}`,fontSize:11,color:"#888",lineHeight:1.7}}>{lpl.ev}{lpl.sources && lpl.sources.length>0 && <div style={{marginTop:6}}><SourceTags keys={lpl.sources} compact/></div>}</div>
+              <button onClick={()=>setView("system")} style={{marginTop:10,background:lpl.color+"18",border:`1px solid ${lpl.color}40`,color:lpl.color,padding:"7px 14px",borderRadius:5,fontSize:11,cursor:"pointer",fontFamily:"inherit",fontWeight:600,minHeight:36}}>View on Map {"\u2192"}</button>
             </div>
           )})():<div style={{textAlign:"center",padding:30,color:"#2a2a3a",fontSize:11}}>Select a loop above</div>}
         </div>)}
@@ -582,7 +637,7 @@ export default function App() {
         {view==="iceberg"&&(<div className="fi">
           <div style={{fontSize:10,color:"#ff4444",textTransform:"uppercase",letterSpacing:3,marginBottom:5}}>Iceberg Model</div>
           <p style={{fontSize:12,color:"#555",marginBottom:12,lineHeight:1.7}}>Most people see the surface events. Underneath lie patterns, structures, and mental models holding the system in place.</p>
-          <div style={{textAlign:"center",fontSize:9,color:"#4488ff",padding:"3px 0",letterSpacing:2,textTransform:"uppercase",borderBottom:"1px solid #4488ff25",marginBottom:6}}>── surface ──</div>
+          <div style={{textAlign:"center",fontSize:9,color:"#4488ff",padding:"3px 0",letterSpacing:2,textTransform:"uppercase",borderBottom:"1px solid #4488ff25",marginBottom:6}}>{"\u2500"} surface {"\u2500"}</div>
           {ICEBERG.map((layer, li) => (
             <div key={layer.layer} style={{background:`${layer.color}08`,border:`1px solid ${layer.color}20`,borderRadius:8,padding:"12px 14px",marginBottom:5}}>
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
@@ -600,8 +655,28 @@ export default function App() {
           <div style={{fontSize:10,color:"#ff4444",textTransform:"uppercase",letterSpacing:3,marginBottom:8}}>All Terms</div>
           <div style={{display:"grid",gap:5}}>{Object.entries(GLOSSARY).map(([t,d])=>(<div key={t} style={{background:"#0c0c14",border:"1px solid #111118",borderRadius:7,padding:"10px 12px"}}><div style={{fontSize:12,fontWeight:700,color:"#fff",marginBottom:3}}>{t}</div><div style={{fontSize:11,color:"#666",lineHeight:1.7}}>{d}</div></div>))}</div>
         </div>)}
+
+        {view==="sources"&&(<div className="fi">
+          <div style={{fontSize:10,color:"#ff4444",textTransform:"uppercase",letterSpacing:3,marginBottom:5}}>Bibliography</div>
+          <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:isTablet?22:18,fontWeight:700,color:"#fff",marginBottom:6,lineHeight:1.2}}>Every Number Has a Source</h2>
+          <p style={{fontSize:12,color:"#666",marginBottom:14,lineHeight:1.7}}>Every statistic, quote, and claim in this map comes from primary research, UN reports, investigative journalism, or peer-reviewed studies. Tap any source below to read the original. Inline citation tags throughout the app link back to this list.</p>
+          <div style={{display:"grid",gap:5}}>
+            {Object.entries(SOURCES).map(([k,s])=>(
+              <a key={k} href={s.u} target="_blank" rel="noopener noreferrer" style={{display:"block",background:"#0c0c14",border:"1px solid #111118",borderRadius:7,padding:"11px 13px",textDecoration:"none",color:"inherit",cursor:"pointer"}}>
+                <div style={{display:"flex",alignItems:"baseline",gap:8,flexWrap:"wrap",marginBottom:3}}>
+                  <span style={{fontSize:10,padding:"2px 7px",borderRadius:3,background:"#1a1a2a",border:"1px solid #2a2a3a",color:"#8aa8c8",fontWeight:600,whiteSpace:"nowrap"}}>{s.l}</span>
+                  <span style={{fontSize:10,color:"#4a6a8a"}}>{s.u.replace(/^https?:\/\/(www\.)?/,'').split('/')[0]}</span>
+                </div>
+                <div style={{fontSize:11,color:"#999",lineHeight:1.65}}>{s.f}</div>
+              </a>
+            ))}
+          </div>
+          <div style={{marginTop:14,padding:"11px 13px",background:"#0c0c14",border:"1px dashed #222232",borderRadius:7,fontSize:10,color:"#555",lineHeight:1.7}}>
+            Additional research synthesized from: UNEP Global Waste Management Outlook 2024, Greenpeace Unearthed investigations, Basel Action Network tracking projects, The Or Foundation, WIEGO, International Alliance of Waste Pickers, the Scientists' Coalition for an Effective Plastics Treaty, and civil society coalitions including CEJAD, GAIA, and Break Free From Plastic.
+          </div>
+        </div>)}
       </div>
-      <div style={{padding:12,borderTop:"1px solid #111118",fontSize:9,color:"#1a1a2a",textAlign:"center",lineHeight:1.7}}>UNEP · Basel Convention · Global E-Waste Monitor · BAN · GAIA · Greenpeace Unearthed · Changing Markets · Global Initiative · World Bank · INTERPOL</div>
+      <div style={{padding:12,borderTop:"1px solid #111118",fontSize:9,color:"#1a1a2a",textAlign:"center",lineHeight:1.7}}>UNEP {"\u00b7"} Basel Convention {"\u00b7"} Global E-Waste Monitor {"\u00b7"} BAN {"\u00b7"} GAIA {"\u00b7"} Greenpeace Unearthed {"\u00b7"} Changing Markets {"\u00b7"} Global Initiative {"\u00b7"} World Bank {"\u00b7"} INTERPOL</div>
     </div>
   );
 }
