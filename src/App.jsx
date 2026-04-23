@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 const NODES = [
   { id: "production", label: "Plastic Production", value: 431, unit: "Mt/yr", base: 431, category: "driver", x: 9, y: 14, desc: "Global plastic production. 431 Mt in 2024, projected 590 Mt by 2050. The upstream source feeding all waste flows.", ix: "Real volume in megatonnes/year.", sources:["gem24","iisd","cci24"], sensitivity: { waste_generated: 0.9, recycling_myth: 0.3, export_volume: 0.7 }},
@@ -137,7 +137,18 @@ const KENYA_STREAMS = [
 
 const CC = { driver: "#4488ff", flow: "#ffaa22", enabler: "#aa66ff", governance: "#44cc88", social: "#ff66aa", impact: "#ff4444" };
 
-// FIX #5: use an explicit touched Set instead of fragile float equality
+// Utility: clean label for display
+const cleanLabel = (label) => label.replace(/\n/g, ' ');
+
+// FIX #1 — SINGLE source of truth for x-compression.
+// Both SVG lines and node cards call this same function so arrows always point at nodes.
+function compressX(x, isMobileCompressed) {
+  // On mobile (non-fullscreen), compress from right so nodes fit in narrow viewport.
+  // Maps x from [0,100] into [5, 92] to give padding and prevent right-edge clipping.
+  if (isMobileCompressed) return 5 + x * 0.87;
+  return x;
+}
+
 function cascade(sid, nv) {
   const R = {}; NODES.forEach(n => R[n.id] = n.base); R[sid] = nv;
   const touched = new Set([sid]);
@@ -196,7 +207,7 @@ function SourceTags({ keys, compact }) {
   );
 }
 
-function NCard({ node, active, affected, loopC, onClick, pulse, rippleKey, fs, isMobile }) {
+function NCard({ node, active, affected, loopC, onClick, pulse, rippleKey, fs, isMobileCompressed }) {
   const p = node.base > 0 ? ((node.value - node.base) / node.base * 100) : 0;
   const absP = Math.abs(p);
   const c = CC[node.category];
@@ -217,21 +228,26 @@ function NCard({ node, active, affected, loopC, onClick, pulse, rippleKey, fs, i
     : loopC ? `0 0 14px ${loopC}35`
     : "none";
 
-  const lblSize = fs ? 11 : isMobile ? 9 : 10;
-  const valSize = fs ? 17 : isMobile ? 13 : 15;
-  const mw = fs ? 130 : isMobile ? 86 : 116;
-  const pad = fs ? "8px 11px 10px" : isMobile ? "5px 7px 7px" : "7px 10px 9px";
+  // FIX #4 — tighter sizing on mobile to prevent overflow
+  const isMobile = isMobileCompressed;
+  const lblSize = fs ? 11 : isMobile ? 8 : 10;
+  const valSize = fs ? 17 : isMobile ? 12 : 15;
+  const mw = fs ? 130 : isMobile ? 76 : 116;
+  const pad = fs ? "8px 11px 10px" : isMobile ? "4px 5px 6px" : "7px 10px 9px";
+
+  // FIX #1 — use the shared compressX for positioning
+  const cx = compressX(node.x, isMobile);
 
   return (
     <div onClick={onClick} style={{
       "--pc": c+"55",
-      position:"absolute", left:`${node.x}%`, top:`${node.y}%`,
+      position:"absolute", left:`${cx}%`, top:`${node.y}%`,
       transform:`translate(-50%,-50%) scale(${scale})`,
       background: bgFill,
       border:`${borderW}px solid ${borderColor}`,
       borderRadius: 8, padding: pad, cursor: "pointer",
       zIndex: absP > 0.5 ? 15 : pulse ? 20 : active ? 10 : affected ? 5 : 1,
-      minWidth: mw, textAlign: "center",
+      minWidth: mw, maxWidth: isMobile ? 90 : 140, textAlign: "center",
       transition: "transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.4s, border-color 0.4s, box-shadow 0.5s",
       boxShadow: shadow,
       WebkitTapHighlightColor:"transparent",
@@ -268,6 +284,24 @@ const TOUR = [
   { title: "Go Deeper", body: "Use the tabs to explore:\n\n\u2022 What If? \u2014 one-click scenarios (China's ban, treaty, AGOA)\n\u2022 Loops \u2014 6 self-reinforcing cycles with animated flow arrows\n\u2022 Iceberg \u2014 hidden structures beneath surface events\n\u2022 Kenya \u2014 timeline, actors, waste streams, human impact\n\u2022 Glossary \u2014 every term explained", hl: null },
 ];
 
+// FIX #2 — Slider track gradient: dynamically compute the green/red split
+// based on actual slider value within its min/max range (10–300).
+// 100% baseline maps to position (100-10)/(300-10) = ~31% along the track.
+const SLIDER_MIN = 10;
+const SLIDER_MAX = 300;
+const SLIDER_BASELINE_PCT = ((100 - SLIDER_MIN) / (SLIDER_MAX - SLIDER_MIN) * 100).toFixed(1); // ~31%
+
+function sliderGradient(value) {
+  const pct = ((value - SLIDER_MIN) / (SLIDER_MAX - SLIDER_MIN) * 100).toFixed(1);
+  if (value <= 100) {
+    // Green from baseline to thumb, grey before that
+    return `linear-gradient(90deg, #1a1a2a 0%, #1a1a2a ${pct}%, #44cc88 ${pct}%, #44cc88 ${SLIDER_BASELINE_PCT}%, #333 ${SLIDER_BASELINE_PCT}%, #333 100%)`;
+  } else {
+    // Red from baseline to thumb
+    return `linear-gradient(90deg, #1a1a2a 0%, #1a1a2a ${SLIDER_BASELINE_PCT}%, #44cc88 ${SLIDER_BASELINE_PCT}%, #44cc88 ${SLIDER_BASELINE_PCT}%, #ff4444 ${SLIDER_BASELINE_PCT}%, #ff4444 ${pct}%, #333 ${pct}%, #333 100%)`;
+  }
+}
+
 export default function App() {
   const [nodes, setNodes] = useState(NODES.map(n => ({...n})));
   const [manip, setManip] = useState(null);
@@ -289,12 +323,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (fullscreen) { document.body.style.overflow = "hidden"; }
-    else { document.body.style.overflow = ""; }
+    document.body.style.overflow = fullscreen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
   }, [fullscreen]);
 
-  // FIX #6: Escape key exits fullscreen
   useEffect(() => {
     if (!fullscreen) return;
     const onKey = (e) => { if (e.key === "Escape") setFullscreen(false); };
@@ -304,7 +336,8 @@ export default function App() {
 
   const isTablet = vw >= 768;
   const isDesktop = vw >= 1024;
-  const isMobile = vw < 600;
+  // FIX #4 — isMobileCompressed is true only for non-fullscreen narrow screens
+  const isMobileCompressed = vw < 600 && !fullscreen;
 
   const bump = () => setRippleKey(k => k + 1);
   const apply = vm => setNodes(NODES.map(n => ({...n, value: vm[n.id] ?? n.base})));
@@ -312,7 +345,6 @@ export default function App() {
   const reset = () => { setNodes(NODES.map(n => ({...n}))); setManip(null); setSlider(100); setScenario(null); };
   const pick = id => { setManip(id); setSlider(100); setScenario(null); setNodes(NODES.map(n => ({...n}))); };
 
-  // FIX #4: compute all cascade deltas against base, then apply once (order-independent)
   const runScenario = sc => {
     if (sc.id === "baseline") { reset(); return; }
     setScenario(sc.id); setManip(null);
@@ -340,15 +372,40 @@ export default function App() {
   if (mn?.sensitivity) { Object.keys(mn.sensitivity).forEach(id => { aff.add(id); const l1 = NODES.find(n => n.id === id); if (l1?.sensitivity) Object.keys(l1.sensitivity).forEach(id2 => { if (id2 !== manip) aff.add(id2); }); }); }
   const lp = loop ? LOOPS.find(l => l.id === loop) : null;
   const lpIds = lp ? new Set(lp.nodes) : new Set();
+
+  // FIX #3 — Tour: when highlighting a node, move the card to the bottom and
+  // show a semi-transparent dark overlay so the highlighted node is clearly visible.
   const tourHL = showTour ? TOUR[ts]?.hl : null;
   const hasHL = !!tourHL;
 
-  // FIX: use 100dvh in fullscreen so iOS URL bar doesn't cut the map
   const mapHeight = fullscreen
     ? "calc(100dvh - 130px)"
     : isDesktop ? 640 : isTablet ? 600 : 520;
 
-  const compressX = (x) => isMobile && !fullscreen ? 9 + (x * 0.82) : x;
+  const GLOBAL_STYLES = `
+    @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600;700&family=Playfair+Display:wght@400;700;900&display=swap');
+    html,body{background:#08080d;min-height:100vh}
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+    html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+    body{touch-action:manipulation}
+    ::-webkit-scrollbar{width:6px}
+    ::-webkit-scrollbar-thumb{background:#222;border-radius:4px}
+    button{font-family:inherit;-webkit-tap-highlight-color:transparent}
+    .fi{animation:fi .25s ease}
+    @keyframes fi{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes pulse{0%,100%{box-shadow:0 0 10px var(--pc,#4488ff33)}50%{box-shadow:0 0 28px var(--pc,#4488ff55),0 0 56px var(--pc,#4488ff22)}}
+    @keyframes ripple{0%{opacity:0.9;transform:scale(1)}100%{opacity:0;transform:scale(1.6)}}
+    @keyframes badgePop{0%{opacity:0;transform:scale(0.3) translateX(-50%)}70%{transform:scale(1.15) translateX(-50%)}100%{opacity:1;transform:scale(1) translateX(-50%)}}
+    @keyframes flowDash{to{stroke-dashoffset:-20}}
+    @keyframes loopGlow{0%,100%{opacity:0.35}50%{opacity:0.9}}
+  `;
+
+  // FIX #2: slider input uses inline style for dynamic gradient
+  const SLIDER_STYLES = `
+    input[type=range]{-webkit-appearance:none;height:5px;border-radius:3px;outline:none;touch-action:pan-x}
+    input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;cursor:pointer;border:3px solid #08080d;box-shadow:0 0 8px rgba(255,255,255,0.2)}
+    input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:#fff;cursor:pointer;border:3px solid #08080d}
+  `;
 
   const renderMap = () => (
     <div style={{position:"relative",width:"100%",height:mapHeight,background:"#0a0a0f",borderRadius:fullscreen?0:8,border:fullscreen?"none":"1px solid #111118",overflow:"hidden"}}>
@@ -359,17 +416,21 @@ export default function App() {
           <marker id="mg" markerWidth="5" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,5 2,0 4" fill="#44cc8855"/></marker>
           {LOOPS.map(l => (<marker key={l.id} id={`ml-${l.id}`} markerWidth="7" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,7 3,0 6" fill={l.color}/></marker>))}
         </defs>
+        {/* FIX #1 — SVG lines use same compressX as node cards */}
         {manip && mn?.sensitivity && Object.entries(mn.sensitivity).map(([tid,s]) => {
           const t = nodes.find(n => n.id === tid); if (!t) return null;
           const pos = s > 0;
-          const sx = compressX(mn.x), tx = compressX(t.x);
+          const sx = compressX(mn.x, isMobileCompressed);
+          const tx = compressX(t.x, isMobileCompressed);
           return (<g key={tid}><line x1={`${sx}%`} y1={`${mn.y}%`} x2={`${tx}%`} y2={`${t.y}%`} stroke={pos?"#ff444440":"#44cc8840"} strokeWidth={Math.abs(s)*2.5+0.5} strokeDasharray="4,3" markerEnd={pos?"url(#mr)":"url(#mg)"}/><text x={`${(sx+tx)/2}%`} y={`${(mn.y+t.y)/2}%`} fill={pos?"#ff4444":"#44cc88"} fontSize="11" fontWeight="700" textAnchor="middle" dy="-3">{pos?"+":"\u2212"}</text></g>);
         })}
         {lp && lp.nodes.map((nid, i) => {
           const from = NODES.find(n => n.id === nid);
           const to = NODES.find(n => n.id === lp.nodes[(i + 1) % lp.nodes.length]);
           if (!from || !to) return null;
-          const fx = compressX(from.x), tx = compressX(to.x);
+          // FIX #1 — loop arrows also use compressX
+          const fx = compressX(from.x, isMobileCompressed);
+          const tx = compressX(to.x, isMobileCompressed);
           const mx = (fx + tx) / 2, my = (from.y + to.y) / 2;
           const dx = tx - fx, dy = to.y - from.y;
           const dist = Math.sqrt(dx*dx + dy*dy);
@@ -377,24 +438,31 @@ export default function App() {
           return (<g key={`loop-${nid}-${i}`}><path d={`M ${fx}% ${from.y}% Q ${mx + perpX}% ${my + perpY}% ${tx}% ${to.y}%`} stroke={lp.color} strokeWidth="2.5" fill="none" strokeDasharray="8,4" strokeLinecap="round" markerEnd={`url(#ml-${lp.id})`} style={{animation:"flowDash 1.2s linear infinite, loopGlow 2s ease-in-out infinite", filter:`drop-shadow(0 0 6px ${lp.color}88)`}}/></g>);
         })}
       </svg>
-      {nodes.map(n => {
-        const nx = isMobile && !fullscreen ? 9 + (n.x * 0.82) : n.x;
-        const nodeAdjusted = {...n, x: nx};
-        return (<NCard key={n.id} node={nodeAdjusted} active={manip===n.id} affected={aff.has(n.id)||lpIds.has(n.id)||(scenario&&n.value!==n.base)} loopC={lpIds.has(n.id)?lp?.color:null} onClick={()=>pick(n.id)} pulse={tourHL===n.id} rippleKey={rippleKey} fs={fullscreen} isMobile={isMobile && !fullscreen}/>);
-      })}
+      {nodes.map(n => (
+        <NCard key={n.id} node={n} active={manip===n.id} affected={aff.has(n.id)||lpIds.has(n.id)||(scenario&&n.value!==n.base)} loopC={lpIds.has(n.id)?lp?.color:null} onClick={()=>pick(n.id)} pulse={tourHL===n.id} rippleKey={rippleKey} fs={fullscreen} isMobileCompressed={isMobileCompressed}/>
+      ))}
     </div>
   );
 
   const renderControl = () => manip ? (
     <div style={{background:"#0c0c14",border:"1px solid #ff444420",borderRadius:8,padding:"10px 12px",marginBottom:8}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-        <div><span style={{fontSize:13,color:"#ff4444",fontWeight:600}}>{mn?.label.replace('\n',' ')}</span><span style={{fontSize:11,color:"#666",marginLeft:8}}>{Math.round(slider)}%</span></div>
+        <div>
+          <span style={{fontSize:13,color:"#ff4444",fontWeight:600}}>{cleanLabel(mn?.label)}</span>
+          {/* FIX #2 — show actual value, not just %, for context */}
+          <span style={{fontSize:11,color:"#666",marginLeft:8}}>{Math.round(slider)}% of baseline</span>
+        </div>
         <button onClick={reset} style={{background:"#1a1a28",border:"1px solid #252540",color:"#888",padding:"5px 12px",borderRadius:5,fontSize:11,cursor:"pointer",fontFamily:"inherit",minHeight:30,WebkitTapHighlightColor:"transparent"}}>Reset</button>
       </div>
-      <input type="range" min={10} max={300} value={slider} onChange={e=>onSlider(+e.target.value)} style={{width:"100%",touchAction:"pan-x"}} />
+      {/* FIX #2 — dynamic slider gradient tracks the thumb correctly */}
+      <input
+        type="range" min={SLIDER_MIN} max={SLIDER_MAX} value={slider}
+        onChange={e=>onSlider(+e.target.value)}
+        style={{width:"100%",touchAction:"pan-x", background: sliderGradient(slider)}}
+      />
       <div style={{position:"relative",height:14,fontSize:9,color:"#3a3a4a",marginTop:2}}>
         <span style={{position:"absolute",left:0}}>{"\u25BC"} 10%</span>
-        <span style={{position:"absolute",left:"31%",transform:"translateX(-50%)",color:"#666"}}>|100%</span>
+        <span style={{position:"absolute",left:`${SLIDER_BASELINE_PCT}%`,transform:"translateX(-50%)",color:"#666"}}>|100%</span>
         <span style={{position:"absolute",right:0}}>300% {"\u25B2"}</span>
       </div>
       {mn?.ix&&<div style={{fontSize:10,color:"#555",marginTop:5,padding:"4px 8px",background:"#08080d",borderRadius:4}}>{mn.ix}</div>}
@@ -406,8 +474,7 @@ export default function App() {
   if (fullscreen) {
     return (
       <div style={{position:"fixed",inset:0,zIndex:5000,background:"#08080d",color:"#d8d5cc",fontFamily:"'Fira Code',monospace",display:"flex",flexDirection:"column"}}>
-        {/* FIX #1: html/body background in fullscreen too */}
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600;700&family=Playfair+Display:wght@400;700;900&display=swap');html,body{background:#08080d;min-height:100vh}*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}input[type=range]{-webkit-appearance:none;height:5px;border-radius:3px;outline:none;background:linear-gradient(90deg,#44cc88 0%,#44cc88 31%,#444 31%,#444 32%,#ff4444 100%);touch-action:pan-x}input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;cursor:pointer;border:3px solid #08080d;box-shadow:0 0 8px rgba(255,255,255,0.2)}input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:#fff;cursor:pointer;border:3px solid #08080d}@keyframes ripple{0%{opacity:0.9;transform:scale(1)}100%{opacity:0;transform:scale(1.6)}}@keyframes badgePop{0%{opacity:0;transform:scale(0.3) translateX(-50%)}70%{transform:scale(1.15) translateX(-50%)}100%{opacity:1;transform:scale(1) translateX(-50%)}}@keyframes flowDash{to{stroke-dashoffset:-20}}@keyframes loopGlow{0%,100%{opacity:0.35}50%{opacity:0.9}}@keyframes pulse{0%,100%{box-shadow:0 0 10px var(--pc,#4488ff33)}50%{box-shadow:0 0 28px var(--pc,#4488ff55),0 0 56px var(--pc,#4488ff22)}}`}</style>
+        <style>{GLOBAL_STYLES + SLIDER_STYLES}</style>
         <div style={{padding:"10px 14px",borderBottom:"1px solid #151520",display:"flex",alignItems:"center",gap:10}}>
           <button onClick={()=>setFullscreen(false)} style={{background:"#1a1a28",border:"1px solid #252540",color:"#ccc",padding:"7px 14px",borderRadius:6,fontSize:12,cursor:"pointer",fontFamily:"inherit",minHeight:36,WebkitTapHighlightColor:"transparent",fontWeight:500}}>{"\u2715"} Close</button>
           <div style={{flex:1}}>
@@ -424,17 +491,39 @@ export default function App() {
 
   return (
     <div style={{background:"#08080d",color:"#d8d5cc",fontFamily:"'Fira Code',monospace",minHeight:"100vh",maxWidth:isDesktop?1200:"100%",margin:"0 auto"}}>
-      {/* FIX #1: html/body background so MacBook wide screens no longer show white edges outside the 1200px cap */}
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600;700&family=Playfair+Display:wght@400;700;900&display=swap');html,body{background:#08080d;min-height:100vh}*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}html{-webkit-text-size-adjust:100%;text-size-adjust:100%}body{touch-action:manipulation}::-webkit-scrollbar{width:6px}::-webkit-scrollbar-thumb{background:#222;border-radius:4px}input[type=range]{-webkit-appearance:none;height:5px;border-radius:3px;outline:none;background:linear-gradient(90deg,#44cc88 0%,#44cc88 31%,#444 31%,#444 32%,#ff4444 100%);touch-action:pan-x}input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;cursor:pointer;border:3px solid #08080d;box-shadow:0 0 8px rgba(255,255,255,0.2)}input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:#fff;cursor:pointer;border:3px solid #08080d}button{font-family:inherit;-webkit-tap-highlight-color:transparent}.fi{animation:fi .25s ease}@keyframes fi{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}@keyframes pulse{0%,100%{box-shadow:0 0 10px var(--pc,#4488ff33)}50%{box-shadow:0 0 28px var(--pc,#4488ff55),0 0 56px var(--pc,#4488ff22)}}@keyframes ripple{0%{opacity:0.9;transform:scale(1)}100%{opacity:0;transform:scale(1.6)}}@keyframes badgePop{0%{opacity:0;transform:scale(0.3) translateX(-50%)}70%{transform:scale(1.15) translateX(-50%)}100%{opacity:1;transform:scale(1) translateX(-50%)}}@keyframes flowDash{to{stroke-dashoffset:-20}}@keyframes loopGlow{0%,100%{opacity:0.35}50%{opacity:0.9}}`}</style>
+      <style>{GLOBAL_STYLES + SLIDER_STYLES}</style>
 
-      {/* FIX #2: tour backdrop becomes transparent when highlighting a node so the pulsing node is visible */}
+      {/* FIX #3 — Tour overlay: always show semi-dark backdrop.
+          When highlighting a node (hasHL), the backdrop is lighter so the pulsing node shows through.
+          The card anchors to the bottom so it doesn't cover the highlighted node. */}
       {showTour && (
-        <div style={{position:"fixed",inset:0,zIndex:2000,display:"flex",flexDirection:"column",justifyContent:hasHL?"flex-end":"center",alignItems:"center",background:hasHL?"transparent":"rgba(0,0,0,0.78)",padding:hasHL?"8px 12px 14px":"16px",transition:"background 0.4s",pointerEvents:hasHL?"none":"auto"}}>
-          <div style={{background:"#141420",border:"1px solid #2a2a4a",borderRadius:14,padding:"20px 22px",maxWidth:420,width:"100%",boxShadow:hasHL?"0 16px 64px rgba(0,0,0,0.95), 0 0 0 1px rgba(255,68,68,0.3)":"0 16px 64px rgba(0,0,0,0.8)",pointerEvents:"auto"}}>
-            <div style={{display:"flex",gap:4,marginBottom:10}}>{TOUR.map((_,i)=>(<div key={i} style={{flex:1,height:3,borderRadius:2,background:i<ts?"#ff4444":i===ts?"#ff4444":i===ts+1?"#ff444440":"#1a1a2a"}}/>))}</div>
+        <div style={{
+          position:"fixed", inset:0, zIndex:2000,
+          display:"flex", flexDirection:"column",
+          justifyContent: hasHL ? "flex-end" : "center",
+          alignItems:"center",
+          background: hasHL ? "rgba(0,0,0,0.55)" : "rgba(0,0,0,0.78)",
+          padding: hasHL ? "8px 12px 14px" : "16px",
+          transition:"background 0.4s, justify-content 0.3s",
+        }}>
+          <div style={{
+            background:"#141420", border:"1px solid #2a2a4a", borderRadius:14,
+            padding:"20px 22px", maxWidth:420, width:"100%",
+            boxShadow: hasHL
+              ? "0 -8px 40px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,68,68,0.2)"
+              : "0 16px 64px rgba(0,0,0,0.8)",
+          }}>
+            <div style={{display:"flex",gap:4,marginBottom:10}}>
+              {TOUR.map((_,i)=>(<div key={i} style={{flex:1,height:3,borderRadius:2,background:i<ts?"#ff4444":i===ts?"#ff4444":i===ts+1?"#ff444440":"#1a1a2a"}}/>))}
+            </div>
             <div style={{fontSize:9,color:"#ff4444",textTransform:"uppercase",letterSpacing:3,marginBottom:5}}>{ts+1} / {TOUR.length}</div>
             <div style={{fontSize:19,fontWeight:700,color:"#fff",fontFamily:"'Playfair Display',serif",marginBottom:8,lineHeight:1.2}}>{TOUR[ts].title}</div>
             <div style={{fontSize:13,color:"#aaa",lineHeight:1.75,marginBottom:16,whiteSpace:"pre-line"}}>{TOUR[ts].body}</div>
+            {hasHL && (
+              <div style={{fontSize:11,color:"#ff6644",marginBottom:10,padding:"6px 10px",background:"#ff440010",borderRadius:6,border:"1px solid #ff440025"}}>
+                {"\u2191"} Look for the pulsing node above
+              </div>
+            )}
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <button onClick={()=>setShowTour(false)} style={{background:"none",border:"none",color:"#555",fontSize:12,cursor:"pointer",fontFamily:"inherit",padding:"6px 8px",minHeight:36}}>Skip</button>
               <div style={{display:"flex",gap:8}}>
@@ -454,7 +543,6 @@ export default function App() {
           </div>
           <button onClick={()=>{setShowTour(true);setTs(0)}} style={{background:"#ff444415",border:"1px solid #ff444430",color:"#ff6666",padding:"6px 12px",borderRadius:6,fontSize:11,cursor:"pointer",fontFamily:"inherit",fontWeight:500,minHeight:34,flexShrink:0}}>? Guide</button>
         </div>
-        {/* FIX #3: \u00b7 wrapped in braces so it renders as · instead of literal backslash-u */}
         <p style={{fontSize:11,color:"#555",marginTop:5}}>Tap nodes {"\u2192"} drag slider {"\u2192"} watch cascade. <Tip term={"Index (0\u2013100)"}>Indexes</Tip> {"\u00b7"} <Tip term="Cascade (3 levels)">Propagation</Tip></p>
       </div>
 
@@ -477,10 +565,10 @@ export default function App() {
           {manip && mn && (
             <div className="fi" style={{marginTop:10,background:"#0c0c14",border:`1px solid ${CC[mn.category]}25`,borderRadius:8,padding:"12px 14px"}}>
               <span style={{fontSize:9,color:CC[mn.category],textTransform:"uppercase",letterSpacing:2,background:CC[mn.category]+"12",padding:"2px 6px",borderRadius:3}}>{mn.category}</span>
-              <div style={{fontSize:14,fontWeight:700,color:"#fff",marginTop:5,marginBottom:4}}>{mn.label.replace('\n',' ')}</div>
+              <div style={{fontSize:14,fontWeight:700,color:"#fff",marginTop:5,marginBottom:4}}>{cleanLabel(mn.label)}</div>
               <div style={{fontSize:11,color:"#888",lineHeight:1.7}}>{mn.desc}</div>
               {mn.sources && mn.sources.length > 0 && <div style={{marginTop:7,display:"flex",alignItems:"center",flexWrap:"wrap",gap:4}}><span style={{fontSize:9,color:"#444",textTransform:"uppercase",letterSpacing:1}}>Sources:</span><SourceTags keys={mn.sources}/></div>}
-              {mn.sensitivity&&<div style={{marginTop:8,display:"flex",flexWrap:"wrap",gap:4}}>{Object.entries(mn.sensitivity).map(([id,s])=>{const t=NODES.find(n=>n.id===id);return t?(<span key={id} style={{fontSize:10,padding:"2px 7px",borderRadius:3,background:s>0?"#ff444412":"#44cc8812",color:s>0?"#ff6666":"#44dd88"}}>{s>0?"\u2191":"\u2193"} {t.label.replace('\n',' ')} {Math.abs(s*100)}%</span>):null})}</div>}
+              {mn.sensitivity&&<div style={{marginTop:8,display:"flex",flexWrap:"wrap",gap:4}}>{Object.entries(mn.sensitivity).map(([id,s])=>{const t=NODES.find(n=>n.id===id);return t?(<span key={id} style={{fontSize:10,padding:"2px 7px",borderRadius:3,background:s>0?"#ff444412":"#44cc8812",color:s>0?"#ff6666":"#44dd88"}}>{s>0?"\u2191":"\u2193"} {cleanLabel(t.label)} {Math.abs(s*100)}%</span>):null})}</div>}
             </div>
           )}
 
@@ -493,7 +581,7 @@ export default function App() {
           {SCENARIOS.map(sc=>(<button key={sc.id} onClick={()=>{runScenario(sc);setView("system")}} style={{display:"block",width:"100%",textAlign:"left",background:"#0a0a0f",border:`1px solid ${scenario===sc.id?"#ff444430":"#111118"}`,borderRadius:8,padding:"12px 14px",marginBottom:7,cursor:"pointer",fontFamily:"inherit",minHeight:60}}>
             <div style={{fontSize:14,fontWeight:600,color:"#fff"}}>{sc.name}</div>
             <div style={{fontSize:11,color:"#666",marginTop:2}}>{sc.desc}</div>
-            {sc.id!=="baseline"&&<div style={{display:"flex",gap:3,flexWrap:"wrap",marginTop:7}}>{Object.entries(sc.changes).map(([id,v])=>{const nd=NODES.find(n=>n.id===id);if(!nd)return null;const p=((v-nd.base)/nd.base*100);return(<span key={id} style={{fontSize:9,padding:"2px 6px",borderRadius:3,background:p>0?"#ff444412":"#44cc8812",color:p>0?"#ff6666":"#44dd88"}}>{nd.label.replace('\n',' ')} {p>0?"+":""}{p.toFixed(0)}%</span>)})}</div>}
+            {sc.id!=="baseline"&&<div style={{display:"flex",gap:3,flexWrap:"wrap",marginTop:7}}>{Object.entries(sc.changes).map(([id,v])=>{const nd=NODES.find(n=>n.id===id);if(!nd)return null;const p=((v-nd.base)/nd.base*100);return(<span key={id} style={{fontSize:9,padding:"2px 6px",borderRadius:3,background:p>0?"#ff444412":"#44cc8812",color:p>0?"#ff6666":"#44dd88"}}>{cleanLabel(nd.label)} {p>0?"+":""}{p.toFixed(0)}%</span>)})}</div>}
           </button>))}
         </div>)}
 
@@ -627,7 +715,7 @@ export default function App() {
             <div className="fi" style={{background:"#0c0c14",border:`1px solid ${lpl.color}25`,borderRadius:8,padding:14}}>
               <div style={{fontSize:16,fontWeight:700,color:lpl.color,fontFamily:"'Playfair Display',serif",marginBottom:4}}>{lpl.icon} {lpl.id}: {lpl.name}</div>
               <div style={{fontSize:11,color:"#777",lineHeight:1.7,marginBottom:10}}>{lpl.desc}</div>
-              <div style={{display:"flex",flexWrap:"wrap",gap:3,alignItems:"center",marginBottom:10}}>{lpl.nodes.map((nid,i)=>{const nd=NODES.find(n=>n.id===nid);return nd?(<div key={`${nid}-${i}`} style={{display:"flex",alignItems:"center",gap:3}}><span style={{padding:"3px 8px",background:lpl.color+"15",border:`1px solid ${lpl.color}30`,borderRadius:4,fontSize:10,color:lpl.color}}>{nd.label.replace('\n',' ')}</span>{i<lpl.nodes.length-1&&<span style={{color:lpl.color,fontSize:12}}>{"\u2192"}</span>}</div>):null})}<span style={{fontSize:11,color:lpl.color,marginLeft:3}}>{"\u21BB"}</span></div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:3,alignItems:"center",marginBottom:10}}>{lpl.nodes.map((nid,i)=>{const nd=NODES.find(n=>n.id===nid);return nd?(<div key={`${nid}-${i}`} style={{display:"flex",alignItems:"center",gap:3}}><span style={{padding:"3px 8px",background:lpl.color+"15",border:`1px solid ${lpl.color}30`,borderRadius:4,fontSize:10,color:lpl.color}}>{cleanLabel(nd.label)}</span>{i<lpl.nodes.length-1&&<span style={{color:lpl.color,fontSize:12}}>{"\u2192"}</span>}</div>):null})}<span style={{fontSize:11,color:lpl.color,marginLeft:3}}>{"\u21BB"}</span></div>
               <div style={{padding:"9px 11px",background:"#08080d",borderRadius:5,borderLeft:`2px solid ${lpl.color}`,fontSize:11,color:"#888",lineHeight:1.7}}>{lpl.ev}{lpl.sources && lpl.sources.length>0 && <div style={{marginTop:6}}><SourceTags keys={lpl.sources} compact/></div>}</div>
               <button onClick={()=>setView("system")} style={{marginTop:10,background:lpl.color+"18",border:`1px solid ${lpl.color}40`,color:lpl.color,padding:"7px 14px",borderRadius:5,fontSize:11,cursor:"pointer",fontFamily:"inherit",fontWeight:600,minHeight:36}}>View on Map {"\u2192"}</button>
             </div>
